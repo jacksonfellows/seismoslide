@@ -1,3 +1,4 @@
+import numpy as np
 import seisbench.data
 from matplotlib import pyplot as plt
 
@@ -15,4 +16,18 @@ def metadata_stats():
         ax.set_title(f"{source_type} ({len(e.event_id.unique())} unique events)")
         g.station_code.count().hist(ax=ax)
     axs[-1].set_xlabel("# of stations")
+    plt.show()
+
+
+def plot_waveform(idx, components=None):
+    sampling_rate = 100
+    ws = pnw_exotic.get_waveforms(idx, sampling_rate=sampling_rate)
+    x = np.arange(ws.shape[1]) / sampling_rate
+    if components is None:
+        components = pnw_exotic.component_order
+    for i, l in enumerate(pnw_exotic.component_order):
+        if l in components:
+            plt.plot(x, ws[i], label=l)
+    plt.xlabel("Time (s)")
+    plt.legend()
     plt.show()
