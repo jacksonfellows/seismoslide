@@ -2,6 +2,7 @@ import numpy as np
 import scipy
 import seisbench.data
 from matplotlib import pyplot as plt
+from sklearn.preprocessing import OrdinalEncoder
 
 pnw_exotic = seisbench.data.PNWExotic()
 # pnw = seisbench.data.PNW()
@@ -38,3 +39,15 @@ def plot_feature_correlation(features):
     C = np.corrcoef(features, rowvar=False)
     plt.imshow(C)
     plt.show()
+
+
+def get_X_y(dataset, class_column="source_type"):
+    dataset: seisbench.data.WaveformDataset
+    print("computing features...")
+    X = compute_features(dataset.get_waveforms(dataset.metadata.index))
+    print("encoding class labels...")
+    enc = OrdinalEncoder()
+    col = dataset.metadata[class_column]
+    enc.fit(col.unique().reshape(-1, 1))
+    y = enc.transform(col.to_numpy().reshape(-1, 1)).reshape(-1)
+    return X, y
