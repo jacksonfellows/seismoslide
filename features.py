@@ -1,11 +1,17 @@
+from pathlib import Path
+
 import numpy as np
 import scipy
 import seisbench.data
+import sklearn
 from matplotlib import pyplot as plt
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import OrdinalEncoder
 
-pnw_exotic = seisbench.data.PNWExotic()
+# pnw_exotic = seisbench.data.PNWExotic()
 # pnw = seisbench.data.PNW()
+
+data = seisbench.data.WaveformDataset(Path.home() / ".seisbench/datasets/seismoslide_1")
 
 
 def compute_features(waveforms):
