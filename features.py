@@ -53,14 +53,26 @@ ENC = OrdinalEncoder()
 ENC.fit([["surface event"], ["earthquake"]])
 
 
-def get_X_y(dataset, class_column="source_type"):
+def get_y(metadata):
+    return ENC.transform(metadata.source_type.to_numpy().reshape(-1, 1)).reshape(-1)
+
+
+def get_X_y(dataset):
     dataset: seisbench.data.WaveformDataset
     print("computing features...")
     X = compute_features(dataset.get_waveforms(dataset.metadata.index))
     print("encoding class labels...")
-    col = dataset.metadata[class_column]
-    y = ENC.transform(col.to_numpy().reshape(-1, 1)).reshape(-1)
+    y = get_y(dataset.metadata)
     return X, y
+
+
+def train_RF(X, y):
+    clf = RandomForestClassifier(1000)
+    X_train, X_test, y_train, y_test = sklearn.model_selection.train_test_split(X, y)
+    print("fitting random forest...")
+    clf.fit(X_train, y_train)
+    print(f"score on test data = {clf.score(X_test, y_test)}")
+    return clf
 
 
 def plot_feature_importances(clf, X_test, y_test):
