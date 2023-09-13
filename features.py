@@ -6,6 +6,7 @@ import seisbench.data
 import sklearn
 from matplotlib import pyplot as plt
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.inspection import permutation_importance
 from sklearn.preprocessing import OrdinalEncoder
 
 # pnw_exotic = seisbench.data.PNWExotic()
@@ -60,3 +61,34 @@ def get_X_y(dataset, class_column="source_type"):
     col = dataset.metadata[class_column]
     y = ENC.transform(col.to_numpy().reshape(-1, 1)).reshape(-1)
     return X, y
+
+
+def plot_feature_importances(clf, X_test, y_test):
+    print("calculating permutation importance...")
+    imps = permutation_importance(clf, X_test, y_test, n_jobs=-1)
+    plt.bar(
+        [
+            f"{i//13+1} {n}"
+            for i, n in enumerate(
+                [
+                    "min",
+                    "max",
+                    "mean",
+                    "var",
+                    "skew",
+                    "kurt",
+                    "fft_min",
+                    "fft_max",
+                    "fft_mean",
+                    "fft_var",
+                    "fft_skew",
+                    "fft_kurt",
+                    "rand",
+                ]
+                * 3
+            )
+        ],
+        imps.importances_mean,
+        yerr=imps.importances_std,
+    )
+    plt.show()
