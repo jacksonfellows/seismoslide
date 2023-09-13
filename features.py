@@ -47,13 +47,15 @@ def plot_feature_correlation(features):
     plt.show()
 
 
+ENC = OrdinalEncoder()
+ENC.fit([["surface event"], ["earthquake"]])
+
+
 def get_X_y(dataset, class_column="source_type"):
     dataset: seisbench.data.WaveformDataset
     print("computing features...")
     X = compute_features(dataset.get_waveforms(dataset.metadata.index))
     print("encoding class labels...")
-    enc = OrdinalEncoder()
     col = dataset.metadata[class_column]
-    enc.fit(col.unique().reshape(-1, 1))
-    y = enc.transform(col.to_numpy().reshape(-1, 1)).reshape(-1)
+    y = ENC.transform(col.to_numpy().reshape(-1, 1)).reshape(-1)
     return X, y
