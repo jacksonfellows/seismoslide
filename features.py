@@ -31,6 +31,7 @@ def compute_features(waveforms):
         fft_desc.variance,
         fft_desc.skewness,
         fft_desc.kurtosis,
+        np.random.rand(*waveforms.shape[:-1]),
     ]
     features = np.zeros((waveforms.shape[0], waveforms.shape[1], len(indiv_features)))
     for i, feature in enumerate(indiv_features):
