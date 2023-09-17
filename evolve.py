@@ -64,7 +64,9 @@ def eval_feature_rec(feature):
             return np.nan_to_num(unary_funcs[f](x_))
         case "x": return W
 
-def eval_feature(feature):
+def eval_feature(feature, simplify_first = True):
+    if simplify_first:
+        feature = simplify_feature(feature)
     r = eval_feature_rec(feature)
     if len(r.shape) > 2:
         return r[:, :, 0]
