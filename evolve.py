@@ -42,6 +42,18 @@ unary_dranks = {
     "im_fft": 0,
 }
 
+def simplify_feature(feature):
+    def rec(tree):
+        match tree:
+            case (f, x):
+                simplified, rank = rec(x)
+                if rank + unary_dranks[f] < 2:
+                    return simplified, rank
+                return (f, simplified), rank + unary_dranks[f]
+            case "x":
+                return "x", 3
+    return rec(feature)[0]
+
 @lru_cache(maxsize=256)         # TODO: This is not the optimal caching strategy.
 def eval_feature_rec(feature):
     match feature:
