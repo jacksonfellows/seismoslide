@@ -1,4 +1,5 @@
 import random
+from collections import namedtuple
 from functools import lru_cache
 from pathlib import Path
 
@@ -72,31 +73,94 @@ def random_feature(max_depth):
         return "x"
     return (random.choice(list(unary_funcs.keys())), random_feature(max_depth - 1))
 
-def evolve_features():
-    pop_size = 30
-    keep_best = 5
-    max_depth = 5
-    population = [random_feature(max_depth) for _ in range(pop_size)]
-    n_generations = 10
-    for g in range(n_generations):
+def mutate_feature(feature, p=0.3):
+    match feature:
+        case (f, x):
+            if random.random() < p:
+                return (random.choice(list(unary_funcs.keys())), mutate_feature(x))
+            return (f, mutate_feature(x))
+        case x:
+            return x
+
+def count_subtrees(feature):
+    match feature:
+        case (_, *x):
+            return 1 + sum(map(count_subtrees, x))
+        case x:
+            return 1
+
+def get_subtree(feature, index):
+    # Kind of ugly.
+    i = 0
+    def rec(tree):
+        nonlocal i
+        if i == index:
+            return tree
+        match tree:
+            case (_, *x):
+                i += 1
+                for x_ in x:
+                    r = rec(x_)
+                    if r is not None: return r
+            case x:
+                i += 1
+                return None
+    return rec(feature)
+
+def swap_subtree(feature, index, subtree):
+    # Kind of ugly.
+    i = 0
+    def rec(tree):
+        nonlocal i
+        if i == index:
+            i += 1
+            return subtree
+        match tree:
+            case (f, *x):
+                i += 1
+                return (f, *[rec(x_) for x_ in x])
+            case x:
+                i += 1
+                return x
+    return rec(feature)
+
+def crossover(feature1, feature2):
+    i1 = random.randrange(count_subtrees(feature1))
+    i2 = random.randrange(count_subtrees(feature2))
+    subtree1 = get_subtree(feature1, i1)
+    subtree2 = get_subtree(feature2, i2)
+    return swap_subtree(feature1, i1, subtree2), swap_subtree(feature2, i2, subtree1)
+
+EvolutionParameters = namedtuple("EvolutionParameters", ("pop_size", "n_keep_best", "crossover_rate", "mutation_rate", "max_depth", "n_generations"))
+
+def evolve_features(parameters : EvolutionParameters):
+    population = [random_feature(parameters.max_depth) for _ in range(parameters.pop_size)]
+    for g in range(parameters.n_generations):
         print(f"generation {g}")
         print("scoring features...")
         fitnesses = score_features(population)
         print(f"max fitness = {fitnesses.max()}, mean fitness = {fitnesses.mean()}")
         new_population = []
-        for i in np.argsort(fitnesses)[-keep_best:]:
+        for i in np.argsort(fitnesses)[-parameters.n_keep_best:]:
             new_population.append(population[i])
-        for _ in range(pop_size - keep_best):
-            new_population.append(random_feature(max_depth))
-        assert len(new_population) == pop_size
+        while len(new_population) < parameters.pop_size:
+            if random.random() < parameters.crossover_rate:
+                new_population.extend(crossover(*random.choices(population, weights=fitnesses, k=2)))
+            elif random.random() < parameters.mutation_rate:
+                new_population.append(mutate_feature(random.choices(population, weights=fitnesses, k=1)[0]))
+            else:
+                new_population.append(random.choices(population, weights=fitnesses, k=1)[0])
         population = new_population
     return population
+
+def meta_evolve_features():
+    ...
 
 def score_model(features):
     print("computing X...")
     X = eval_features(features)
-    clf = RandomForestClassifier(1000)
-    X_train, X_test, y_train, y_test = train_test_split(X, y)
+    clf = RandomForestClassifier(1000, random_state=RANDOM_STATE)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=RANDOM_STATE)
     print("fitting model...")
     clf.fit(X_train, y_train)
     print("scoring model...")
