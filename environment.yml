@@ -16,3 +16,4 @@ dependencies:
  - python-lsp-server=1.7.4
  - ipython=8.14
  - pyflakes=3.0.1
+ - black=23.9.1

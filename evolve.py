@@ -42,6 +42,7 @@ unary_dranks = {
     "im_fft": 0,
 }
 
+
 def simplify_feature(feature):
     def rec(tree):
         match tree:
@@ -52,9 +53,11 @@ def simplify_feature(feature):
                 return (f, simplified), rank + unary_dranks[f]
             case "x":
                 return "x", 3
+
     return rec(feature)[0]
 
-@lru_cache(maxsize=256)         # TODO: This is not the optimal caching strategy.
+
+@lru_cache(maxsize=256)  # TODO: This is not the optimal caching strategy.
 def eval_feature_rec(feature):
     match feature:
         case (f, x):
@@ -62,9 +65,11 @@ def eval_feature_rec(feature):
             if len(x_.shape) + unary_dranks[f] < 2:
                 return x_
             return np.nan_to_num(unary_funcs[f](x_))
-        case "x": return W
+        case "x":
+            return W
 
-def eval_feature(feature, simplify_first = True):
+
+def eval_feature(feature, simplify_first=True):
     if simplify_first:
         feature = simplify_feature(feature)
     r = eval_feature_rec(feature)
@@ -72,20 +77,24 @@ def eval_feature(feature, simplify_first = True):
         return r[:, :, 0]
     return r
 
+
 def eval_features(features):
     X = np.zeros((*W.shape[:-1], len(features)))
-    for i,feature in enumerate(features):
+    for i, feature in enumerate(features):
         X[:, :, i] = eval_feature(feature)
     return X.reshape((W.shape[0], -1))
+
 
 def score_features(features):
     scores = mutual_info_classif(eval_features(features), y, random_state=RANDOM_STATE)
     return scores.reshape((3, -1)).mean(axis=0)
 
+
 def random_feature(max_depth):
     if max_depth == 0 or random.random() < 0.3:
         return "x"
     return (random.choice(list(unary_funcs.keys())), random_feature(max_depth - 1))
+
 
 def mutate_feature(feature, p=0.3):
     match feature:
@@ -96,6 +105,7 @@ def mutate_feature(feature, p=0.3):
         case x:
             return x
 
+
 def count_subtrees(feature):
     match feature:
         case (_, *x):
@@ -103,9 +113,11 @@ def count_subtrees(feature):
         case x:
             return 1
 
+
 def get_subtree(feature, index):
     # Kind of ugly.
     i = 0
+
     def rec(tree):
         nonlocal i
         if i == index:
@@ -115,15 +127,19 @@ def get_subtree(feature, index):
                 i += 1
                 for x_ in x:
                     r = rec(x_)
-                    if r is not None: return r
+                    if r is not None:
+                        return r
             case x:
                 i += 1
                 return None
+
     return rec(feature)
+
 
 def swap_subtree(feature, index, subtree):
     # Kind of ugly.
     i = 0
+
     def rec(tree):
         nonlocal i
         if i == index:
@@ -136,7 +152,9 @@ def swap_subtree(feature, index, subtree):
             case x:
                 i += 1
                 return x
+
     return rec(feature)
+
 
 def crossover(feature1, feature2):
     i1 = random.randrange(count_subtrees(feature1))
@@ -145,30 +163,54 @@ def crossover(feature1, feature2):
     subtree2 = get_subtree(feature2, i2)
     return swap_subtree(feature1, i1, subtree2), swap_subtree(feature2, i2, subtree1)
 
-EvolutionParameters = namedtuple("EvolutionParameters", ("pop_size", "n_keep_best", "crossover_rate", "mutation_rate", "max_depth", "n_generations"))
 
-def evolve_features(parameters : EvolutionParameters):
-    population = [random_feature(parameters.max_depth) for _ in range(parameters.pop_size)]
+EvolutionParameters = namedtuple(
+    "EvolutionParameters",
+    (
+        "pop_size",
+        "n_keep_best",
+        "crossover_rate",
+        "mutation_rate",
+        "max_depth",
+        "n_generations",
+    ),
+)
+
+
+def evolve_features(parameters: EvolutionParameters):
+    population = [
+        random_feature(parameters.max_depth) for _ in range(parameters.pop_size)
+    ]
     for g in range(parameters.n_generations):
         print(f"generation {g}")
         print("scoring features...")
         fitnesses = score_features(population)
         print(f"max fitness = {fitnesses.max()}, mean fitness = {fitnesses.mean()}")
         new_population = []
-        for i in np.argsort(fitnesses)[-parameters.n_keep_best:]:
+        for i in np.argsort(fitnesses)[-parameters.n_keep_best :]:
             new_population.append(population[i])
         while len(new_population) < parameters.pop_size:
             if random.random() < parameters.crossover_rate:
-                new_population.extend(crossover(*random.choices(population, weights=fitnesses, k=2)))
+                new_population.extend(
+                    crossover(*random.choices(population, weights=fitnesses, k=2))
+                )
             elif random.random() < parameters.mutation_rate:
-                new_population.append(mutate_feature(random.choices(population, weights=fitnesses, k=1)[0]))
+                new_population.append(
+                    mutate_feature(
+                        random.choices(population, weights=fitnesses, k=1)[0]
+                    )
+                )
             else:
-                new_population.append(random.choices(population, weights=fitnesses, k=1)[0])
+                new_population.append(
+                    random.choices(population, weights=fitnesses, k=1)[0]
+                )
         population = new_population
     return population
 
+
 def meta_evolve_features():
     ...
+
 
 def score_model(features):
     print("computing X...")
