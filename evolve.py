@@ -8,7 +8,7 @@ import scipy
 import seisbench.data
 from matplotlib import pyplot as plt
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.feature_selection import mutual_info_classif
+from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 from sklearn.model_selection import train_test_split
 
 dataset = seisbench.data.WaveformDataset(
@@ -88,6 +88,22 @@ def eval_features(features):
 def score_features(features):
     scores = mutual_info_classif(eval_features(features), y, random_state=RANDOM_STATE)
     return scores.reshape((3, -1)).mean(axis=0)
+
+
+def score_features_with_existing(features, existing_features):
+    features_X = eval_features(features)
+    target_scores = mutual_info_classif(features_X, y, random_state=RANDOM_STATE)
+    if len(existing_features) == 0:
+        return target_scores.reshape((3, -1)).mean(axis=0)
+    existing_Xs = eval_features(existing_features)
+    existing_scores = np.zeros(target_scores.shape)
+    for i in range(existing_Xs.shape[-1]):
+        existing_scores += mutual_info_regression(
+            features_X, existing_Xs[:, i], random_state=RANDOM_STATE
+        )
+    target_scores = target_scores.reshape((3, -1)).mean(axis=0)
+    existing_scores = existing_scores.reshape((3, -1)).mean(axis=0)
+    return target_scores * (1 - existing_scores / existing_scores.max())
 
 
 def random_feature(max_depth):
@@ -177,14 +193,14 @@ EvolutionParameters = namedtuple(
 )
 
 
-def evolve_features(parameters: EvolutionParameters):
+def evolve_features(parameters: EvolutionParameters, fitness_f):
     population = [
         random_feature(parameters.max_depth) for _ in range(parameters.pop_size)
     ]
     for g in range(parameters.n_generations):
         print(f"generation {g}")
         print("scoring features...")
-        fitnesses = score_features(population)
+        fitnesses = fitness_f(population)
         print(f"max fitness = {fitnesses.max()}, mean fitness = {fitnesses.mean()}")
         new_population = []
         for i in np.argsort(fitnesses)[-parameters.n_keep_best :]:
@@ -208,8 +224,17 @@ def evolve_features(parameters: EvolutionParameters):
     return population
 
 
-def meta_evolve_features():
-    ...
+def meta_evolve_features(parameters: EvolutionParameters, n_features):
+    existing_features = []
+    for _ in range(n_features):
+        new_feature = evolve_features(
+            parameters,
+            fitness_f=lambda x: score_features_with_existing(x, existing_features),
+        )[0]
+        new_feature = simplify_feature(new_feature)
+        print(f"adding feature {new_feature}")
+        existing_features.append(new_feature)
+    return existing_features
 
 
 def score_model(features):
