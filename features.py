@@ -9,10 +9,29 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.inspection import permutation_importance
 from sklearn.preprocessing import OrdinalEncoder
 
+from create_dataset import qualified_station_name
+
 # pnw_exotic = seisbench.data.PNWExotic()
 # pnw = seisbench.data.PNW()
 
 data = seisbench.data.WaveformDataset(Path.home() / ".seisbench/datasets/seismoslide_1")
+
+
+def find_left_out(original_data):
+    traces = (
+        original_data.metadata.event_id
+        + "."
+        + qualified_station_name(original_data.metadata)
+    )
+    included_traces = (
+        data.metadata.event_id + "." + qualified_station_name(data.metadata)
+    )
+    left_out_traces = list(set(traces) - set(included_traces))
+    idx = traces.isin(left_out_traces)
+    new_metadata = original_data.metadata[
+        original_data.metadata.source_type.isin(["surface event", "earthquake"]) & idx
+    ]
+    return original_data.get_waveforms(new_metadata.index), new_metadata
 
 
 def compute_features(waveforms):
