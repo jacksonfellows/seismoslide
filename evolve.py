@@ -189,6 +189,10 @@ class Evolver:
             print("scoring features...")
             fitnesses = fitness_f(population)
             print(f"max fitness = {fitnesses.max()}, mean fitness = {fitnesses.mean()}")
+            if fitnesses.sum() == 0:
+                fitnesses += (
+                    0.001  # random.choice doesn't like when the sum of weights is <= 0.
+                )
             new_population = []
             for i in np.argsort(fitnesses)[-parameters.n_keep_best :]:
                 new_population.append(population[i])
