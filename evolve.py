@@ -27,13 +27,14 @@ EvolutionParameters = namedtuple(
     ),
 )
 
+OperatorDef = namedtuple("OperatorDef", ("arity", "delta_rank", "apply"))
+
 
 class Evolver:
-    def __init__(self, W, y, unary_funcs, unary_dranks):
+    def __init__(self, W, y, operators):
         self.W = W
         self.y = y
-        self.unary_funcs = unary_funcs
-        self.unary_dranks = unary_dranks
+        self.operators = operators
         # Hard-code for now.
         self.terminals = {
             "Z": W[:, 0],
@@ -46,11 +47,11 @@ class Evolver:
             match tree:
                 case (f, x):
                     simplified, rank = rec(x)
-                    if rank + self.unary_dranks[f] < 1:
+                    if rank + self.operators[f].delta_rank < 1:
                         return simplified, rank
-                    return (f, simplified), rank + self.unary_dranks[f]
+                    return (f, simplified), rank + self.operators[f].delta_rank
                 case x:
-                    return x, 2
+                    return x, len(self.terminals[x].shape)
 
         return rec(feature)[0]
 
@@ -59,9 +60,9 @@ class Evolver:
         match feature:
             case (f, x):
                 x_ = self.eval_feature_rec(x)
-                if len(x_.shape) + self.unary_dranks[f] < 1:
+                if len(x_.shape) + self.operators[f].delta_rank < 1:
                     return x_
-                return np.nan_to_num(self.unary_funcs[f](x_))
+                return np.nan_to_num(self.operators[f].apply(x_))
             case x:
                 return self.terminals[x]
 
@@ -104,7 +105,7 @@ class Evolver:
         if max_depth == 0 or random.random() < 0.3:
             return random.choice(list(self.terminals.keys()))
         return (
-            random.choice(list(self.unary_funcs.keys())),
+            random.choice(list(self.operators.keys())),
             self.random_feature(max_depth - 1),
         )
 
@@ -113,7 +114,7 @@ class Evolver:
             case (f, x):
                 if random.random() < p:
                     return (
-                        random.choice(list(self.unary_funcs.keys())),
+                        random.choice(list(self.operators.keys())),
                         self.point_mutate_feature(x),
                     )
                 return (f, self.point_mutate_feature(x))
@@ -245,25 +246,27 @@ dataset = seisbench.data.WaveformDataset(
 default_evolver = Evolver(
     W=dataset.get_waveforms(mask=np.ones(len(dataset), dtype=bool)),
     y=(dataset.metadata.source_type == "surface event").to_numpy(dtype=int),
-    unary_funcs={
-        "min": lambda x: np.min(x, axis=-1),
-        "max": lambda x: np.max(x, axis=-1),
-        "mean": lambda x: np.mean(x, axis=-1),
-        "median": lambda x: np.median(x, axis=-1),
-        "skew": lambda x: scipy.stats.skew(x, axis=-1),
-        "kurtosis": lambda x: scipy.stats.kurtosis(x, axis=-1),
-        "re_fft": lambda x: np.real(scipy.fft.fft(x, axis=-1)),
-        "im_fft": lambda x: np.imag(scipy.fft.fft(x, axis=-1)),
-    },
-    unary_dranks={
-        "min": -1,
-        "max": -1,
-        "mean": -1,
-        "median": -1,
-        "skew": -1,
-        "kurtosis": -1,
-        "re_fft": 0,
-        "im_fft": 0,
+    operators={
+        "min": OperatorDef(arity=1, delta_rank=-1, apply=lambda x: np.min(x, axis=-1)),
+        "max": OperatorDef(arity=1, delta_rank=-1, apply=lambda x: np.max(x, axis=-1)),
+        "mean": OperatorDef(
+            arity=1, delta_rank=-1, apply=lambda x: np.mean(x, axis=-1)
+        ),
+        "median": OperatorDef(
+            arity=1, delta_rank=-1, apply=lambda x: np.median(x, axis=-1)
+        ),
+        "skew": OperatorDef(
+            arity=1, delta_rank=-1, apply=lambda x: scipy.stats.skew(x, axis=-1)
+        ),
+        "kurtosis": OperatorDef(
+            arity=1, delta_rank=-1, apply=lambda x: scipy.stats.kurtosis(x, axis=-1)
+        ),
+        "re_fft": OperatorDef(
+            arity=1, delta_rank=0, apply=lambda x: np.real(scipy.fft.fft(x, axis=-1))
+        ),
+        "im_fft": OperatorDef(
+            arity=1, delta_rank=0, apply=lambda x: np.imag(scipy.fft.fft(x, axis=-1))
+        ),
     },
 )
 
