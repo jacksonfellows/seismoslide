@@ -84,8 +84,21 @@ class Evolver:
             self.eval_features(features), self.y, random_state=RANDOM_STATE
         )
 
+    def score_features_similarity(self, features, existing_features):
+        A = self.eval_features(features)
+        B = self.eval_features(existing_features)
+        C = np.abs(np.nan_to_num(np.corrcoef(A, B, rowvar=False)))
+        # Does max make sense?
+        return C[: len(features), -len(existing_features) :].max(axis=-1)
+
     def score_features_with_existing(self, features, existing_features):
-        ...
+        score = self.score_features(features)  # mutual importance
+        if len(existing_features) == 0:
+            return score
+        simil = self.score_features_similarity(
+            features, existing_features
+        )  # absolute correlation [0,1]
+        return np.clip(score - 0.17 * simil, 0, None)
 
     def random_feature(self, max_depth):
         if max_depth == 0 or random.random() < 0.3:
