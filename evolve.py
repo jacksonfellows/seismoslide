@@ -34,17 +34,23 @@ class Evolver:
         self.y = y
         self.unary_funcs = unary_funcs
         self.unary_dranks = unary_dranks
+        # Hard-code for now.
+        self.terminals = {
+            "Z": W[:, 0],
+            "N": W[:, 1],
+            "E": W[:, 2],
+        }
 
     def simplify_feature(self, feature):
         def rec(tree):
             match tree:
                 case (f, x):
                     simplified, rank = rec(x)
-                    if rank + self.unary_dranks[f] < 2:
+                    if rank + self.unary_dranks[f] < 1:
                         return simplified, rank
                     return (f, simplified), rank + self.unary_dranks[f]
-                case "x":
-                    return "x", 3
+                case x:
+                    return x, 2
 
         return rec(feature)[0]
 
@@ -53,68 +59,56 @@ class Evolver:
         match feature:
             case (f, x):
                 x_ = self.eval_feature_rec(x)
-                if len(x_.shape) + self.unary_dranks[f] < 2:
+                if len(x_.shape) + self.unary_dranks[f] < 1:
                     return x_
                 return np.nan_to_num(self.unary_funcs[f](x_))
-            case "x":
-                return self.W
+            case x:
+                return self.terminals[x]
 
     def eval_feature(self, feature, simplify_first=True):
         if simplify_first:
             feature = self.simplify_feature(feature)
-        r = self.eval_feature_rec(feature)
-        if len(r.shape) > 2:
-            return r[:, :, 0]
-        return r
+        x = self.eval_feature_rec(feature)
+        while len(x.shape) > 1:  # TODO: stupid
+            x = x[:, 0]
+        return x
 
     def eval_features(self, features):
-        X = np.zeros((*self.W.shape[:-1], len(features)))
+        X = np.zeros((self.W.shape[0], len(features)))
         for i, feature in enumerate(features):
-            X[:, :, i] = self.eval_feature(feature)
-        return X.reshape((self.W.shape[0], -1))
+            X[:, i] = self.eval_feature(feature)
+        return X
 
     def score_features(self, features):
-        scores = mutual_info_classif(
+        return mutual_info_classif(
             self.eval_features(features), self.y, random_state=RANDOM_STATE
         )
-        return scores.reshape((3, -1)).mean(axis=0)
 
     def score_features_with_existing(self, features, existing_features):
-        features_X = self.eval_features(features)
-        target_scores = mutual_info_classif(
-            features_X, self.y, random_state=RANDOM_STATE
-        )
-        if len(existing_features) == 0:
-            return target_scores.reshape((3, -1)).mean(axis=0)
-        existing_Xs = self.eval_features(existing_features)
-        existing_scores = np.zeros(target_scores.shape)
-        for i in range(existing_Xs.shape[-1]):
-            existing_scores += mutual_info_regression(
-                features_X, existing_Xs[:, i], random_state=RANDOM_STATE
-            )
-        target_scores = target_scores.reshape((3, -1)).mean(axis=0)
-        existing_scores = existing_scores.reshape((3, -1)).mean(axis=0)
-        return target_scores * (1 - existing_scores / existing_scores.max())
+        ...
 
     def random_feature(self, max_depth):
         if max_depth == 0 or random.random() < 0.3:
-            return "x"
+            return random.choice(list(self.terminals.keys()))
         return (
             random.choice(list(self.unary_funcs.keys())),
             self.random_feature(max_depth - 1),
         )
 
-    def mutate_feature(self, feature, p=0.3):
+    def point_mutate_feature(self, feature, p=0.3):
         match feature:
             case (f, x):
                 if random.random() < p:
                     return (
                         random.choice(list(self.unary_funcs.keys())),
-                        self.mutate_feature(x),
+                        self.point_mutate_feature(x),
                     )
-                return (f, self.mutate_feature(x))
+                return (f, self.point_mutate_feature(x))
             case x:
-                return x
+                if random.random() < p:
+                    return random.choice(list(self.terminals.keys()))
+                else:
+                    return x
 
     def count_subtrees(self, feature):
         match feature:
@@ -194,7 +188,7 @@ class Evolver:
                     )
                 elif random.random() < parameters.mutation_rate:
                     new_population.append(
-                        self.mutate_feature(
+                        self.point_mutate_feature(
                             random.choices(population, weights=fitnesses, k=1)[0]
                         )
                     )
