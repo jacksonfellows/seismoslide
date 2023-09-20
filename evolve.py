@@ -10,7 +10,7 @@ import seisbench.data
 from matplotlib import pyplot as plt
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import cross_val_score
 
 RANDOM_STATE = 2001
 
@@ -223,14 +223,9 @@ class Evolver:
         print("computing X...")
         X = self.eval_features(features)
         clf = RandomForestClassifier(1000, random_state=RANDOM_STATE)
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, self.y, random_state=RANDOM_STATE
-        )
-        print("fitting model...")
-        clf.fit(X_train, y_train)
-        print("scoring model...")
-        score = clf.score(X_test, y_test)
-        print(f"{score=}")
+        print("cross validating model...")
+        scores = cross_val_score(clf, X, self.y)
+        print(f"mean score={scores.mean()}")
 
 
 dataset = seisbench.data.WaveformDataset(
