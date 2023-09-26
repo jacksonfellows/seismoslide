@@ -1,7 +1,7 @@
 import random
 import time
 from collections import namedtuple
-from functools import lru_cache
+from functools import lru_cache, wraps
 from pathlib import Path
 
 import numpy as np
@@ -9,8 +9,9 @@ import scipy
 import seisbench.data
 from matplotlib import pyplot as plt
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
-from sklearn.model_selection import cross_val_score
+from sklearn.feature_selection import mutual_info_classif
+from sklearn.inspection import permutation_importance
+from sklearn.model_selection import ShuffleSplit, cross_val_score, train_test_split
 
 RANDOM_STATE = 2001
 
@@ -28,7 +29,7 @@ EvolutionParameters = namedtuple(
     ),
 )
 
-OperatorDef = namedtuple("OperatorDef", ("arity", "delta_rank", "apply"))
+OperatorDef = namedtuple("OperatorDef", ("arity", "delta_rank", "apply", "cell_rank"))
 
 
 class Evolver:
@@ -49,6 +50,9 @@ class Evolver:
                 case (f, *x):
                     simplifieds, ranks = zip(*map(rec, x))
                     max_rank = max(ranks)
+                    if max_rank == self.operators[f].cell_rank:
+                        # Would combine across traces - Not allowed.
+                        return simplifieds[0], max_rank
                     if max_rank + self.operators[f].delta_rank < 1:
                         # No-op.
                         return simplifieds[0], max_rank
@@ -58,12 +62,18 @@ class Evolver:
 
         return rec(feature)[0]
 
-    @lru_cache(maxsize=128)  # TODO: This is not the optimal caching strategy.
+    @lru_cache(maxsize=64)  # TODO: This is not the optimal caching strategy.
     def eval_feature_rec(self, feature):
+        # print(f"eval_feature_rec({feature})")
         match feature:
             case (f, *x):
                 x_ = list(map(self.eval_feature_rec, x))
-                if min(len(x__.shape) for x__ in x_) + self.operators[f].delta_rank < 1:
+                max_rank = max(len(x__.shape) for x__ in x_)
+                if max_rank == self.operators[f].cell_rank:
+                    # Would combine across traces - Not allowed.
+                    return x_[0]
+                if max_rank + self.operators[f].delta_rank < 1:
+                    # No-op.
                     return x_[0]
                 return np.nan_to_num(self.operators[f].apply(*x_))
             case x:
@@ -78,15 +88,19 @@ class Evolver:
         return x
 
     def eval_features(self, features):
+        print(f"evaluating {len(features)} features")
         X = np.zeros((self.W.shape[0], len(features)))
         for i, feature in enumerate(features):
+            # print(f"evaluating feature {i}")
             X[:, i] = self.eval_feature(feature)
         return X
 
     def score_features(self, features):
-        return mutual_info_classif(
-            self.eval_features(features), self.y, random_state=RANDOM_STATE
-        )
+        X = self.eval_features(features)
+        print("calculating mutual info...")
+        mi = mutual_info_classif(X, self.y, random_state=RANDOM_STATE)
+        n_subtrees = np.array([self.count_subtrees(f) for f in features])
+        return np.clip(mi - 0.1 / (1 + np.exp(5 - 0.4 * n_subtrees)), 0, None)
 
     def score_features_similarity(self, features, existing_features):
         A = self.eval_features(features)
@@ -203,7 +217,7 @@ class Evolver:
             print("scoring features...")
             fitnesses = fitness_f(population)
             print(
-                f"max fitness={fitnesses.max():0.3}, mean fitness={fitnesses.mean():0.3}, best feature={self.simplify_feature(population[np.argmax(fitnesses)])}"
+                f"max fitness={fitnesses.max():0.3f}, mean fitness={fitnesses.mean():0.3f}, best feature={self.simplify_feature(population[np.argmax(fitnesses)])}"
             )
             if fitnesses.sum() == 0:
                 fitnesses += (
@@ -250,19 +264,54 @@ class Evolver:
         print("computing X...")
         X = self.eval_features(features)
         clf = RandomForestClassifier(1000, random_state=RANDOM_STATE)
-        print("cross validating model...")
-        scores = cross_val_score(clf, X, self.y)
+        n_splits = 8
+        print(f"cross validating model (shuffle splits, {n_splits=})")
+        scores = cross_val_score(clf, X, self.y, cv=ShuffleSplit(n_splits=n_splits))
         print(f"mean score={scores.mean()}")
+
+    def calculate_permutation_importances(self, features):
+        print("computing X...")
+        X = self.eval_features(features)
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, self.y, random_state=RANDOM_STATE
+        )
+        print("fitting model...")
+        clf = RandomForestClassifier(1000, random_state=RANDOM_STATE)
+        clf.fit(X_train, y_train)
+        print("scoring model...")
+        score = clf.score(X_test, y_test)
+        print(f"{score=}")
+        print("calculating permutation importances...")
+        imps = permutation_importance(clf, X_test, y_test)
+        print(f"{imps=}")
 
 
 # Operators.
+def make_same_rank(f):
+    @wraps(f)
+    def wrapper(*args):
+        max_rank = max(len(x.shape) for x in args)
+        new_args = []
+        for arg in args:
+            while len(arg.shape) < max_rank:
+                arg = np.expand_dims(arg, -1)
+            new_args.append(arg)
+        return f(*new_args)
+
+    return wrapper
+
+
+@make_same_rank
 def safe_sum(x, y):
-    if len(y.shape) < len(x.shape):
-        x, y = y, x
-    # rank(x) <= rank(y)
-    while len(x.shape) < len(y.shape):
-        x = np.expand_dims(x, -1)
     return x + y
+
+
+@make_same_rank
+def safe_correlate(x, y):
+    res = np.empty_like(x)
+    for i in np.ndindex(res.shape[:-1]):
+        res[i] = scipy.signal.correlate(x[i], y[i], mode="same")
+    return res
 
 
 dataset = seisbench.data.WaveformDataset(
@@ -272,27 +321,38 @@ default_evolver = Evolver(
     W=dataset.get_waveforms(mask=np.ones(len(dataset), dtype=bool)),
     y=(dataset.metadata.source_type == "surface event").to_numpy(dtype=int),
     operators={
-        "min": OperatorDef(arity=1, delta_rank=-1, apply=lambda x: np.min(x, axis=-1)),
-        "max": OperatorDef(arity=1, delta_rank=-1, apply=lambda x: np.max(x, axis=-1)),
-        # "mean": OperatorDef(
-        #     arity=1, delta_rank=-1, apply=lambda x: np.mean(x, axis=-1)
-        # ),
-        # "median": OperatorDef(
-        #     arity=1, delta_rank=-1, apply=lambda x: np.median(x, axis=-1)
-        # ),
+        "min": OperatorDef(
+            arity=1, delta_rank=-1, cell_rank=1, apply=lambda x: np.min(x, axis=-1)
+        ),
+        "max": OperatorDef(
+            arity=1, delta_rank=-1, cell_rank=1, apply=lambda x: np.max(x, axis=-1)
+        ),
+        "argmax": OperatorDef(
+            arity=1, delta_rank=-1, cell_rank=1, apply=lambda x: np.argmax(x, axis=-1)
+        ),
         "skew": OperatorDef(
-            arity=1, delta_rank=-1, apply=lambda x: scipy.stats.skew(x, axis=-1)
+            arity=1,
+            delta_rank=-1,
+            cell_rank=1,
+            apply=lambda x: scipy.stats.skew(x, axis=-1),
         ),
         "kurtosis": OperatorDef(
-            arity=1, delta_rank=-1, apply=lambda x: scipy.stats.kurtosis(x, axis=-1)
+            arity=1,
+            delta_rank=-1,
+            cell_rank=1,
+            apply=lambda x: scipy.stats.kurtosis(x, axis=-1),
         ),
         "re_fft": OperatorDef(
-            arity=1, delta_rank=0, apply=lambda x: np.real(scipy.fft.fft(x, axis=-1))
+            arity=1,
+            delta_rank=0,
+            cell_rank=1,
+            apply=lambda x: np.real(scipy.fft.fft(x, axis=-1)),
         ),
         # "im_fft": OperatorDef(
-        #     arity=1, delta_rank=0, apply=lambda x: np.imag(scipy.fft.fft(x, axis=-1))
+        #     arity=1, delta_rank=0, cell_rank=1, apply=lambda x: np.imag(scipy.fft.fft(x, axis=-1))
         # ),
-        "+": OperatorDef(arity=2, delta_rank=0, apply=safe_sum),
+        "+": OperatorDef(arity=2, delta_rank=0, cell_rank=0, apply=safe_sum),
+        "corr": OperatorDef(arity=2, delta_rank=0, cell_rank=1, apply=safe_correlate),
     },
 )
 
@@ -320,15 +380,15 @@ def benchmark_default_single():
 def benchmark_default():
     start_t = time.time()
     params = EvolutionParameters(
-        pop_size=30,
+        pop_size=50,
         n_keep_best=5,
         crossover_rate=0.5,
         mutation_rate=0.4,
-        max_depth=3,
-        n_generations=20,
+        max_depth=5,
+        n_generations=10,
         terminal_proba=0.5,
     )
-    n_features = 10
+    n_features = 30
     print(f"{params=} {n_features=}")
     fs = default_evolver.meta_evolve_features(params, n_features)
     default_evolver.score_model(fs)
