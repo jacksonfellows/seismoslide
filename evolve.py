@@ -260,14 +260,23 @@ class Evolver:
             existing_features.append(new_feature)
         return existing_features
 
-    def score_model(self, features):
+    def score_model(self, features, n_jobs=None):
         print("computing X...")
         X = self.eval_features(features)
         clf = RandomForestClassifier(1000, random_state=RANDOM_STATE)
         n_splits = 8
-        print(f"cross validating model (shuffle splits, {n_splits=})")
-        scores = cross_val_score(clf, X, self.y, cv=ShuffleSplit(n_splits=n_splits))
-        print(f"mean score={scores.mean()}")
+        test_size = 0.25
+        print(f"cross validating model (shuffle splits, {n_splits=}, {test_size=})")
+        scores = cross_val_score(
+            clf,
+            X,
+            self.y,
+            cv=ShuffleSplit(n_splits=n_splits, test_size=test_size),
+            n_jobs=n_jobs,
+        )
+        mean_score = scores.mean()
+        print(f"mean score={mean_score}")
+        return mean_score
 
     def calculate_permutation_importances(self, features):
         print("computing X...")
