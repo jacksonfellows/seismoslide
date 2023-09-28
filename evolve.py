@@ -278,7 +278,7 @@ class Evolver:
         print(f"mean score={mean_score}")
         return mean_score
 
-    def calculate_permutation_importances(self, features):
+    def calculate_permutation_importances(self, features, n_jobs=None):
         print("computing X...")
         X = self.eval_features(features)
         X_train, X_test, y_train, y_test = train_test_split(
@@ -290,9 +290,13 @@ class Evolver:
         print("scoring model...")
         score = clf.score(X_test, y_test)
         print(f"{score=}")
-        print("calculating permutation importances...")
-        imps = permutation_importance(clf, X_test, y_test)
+        n_repeats = 8
+        print(f"calculating permutation importances ({n_repeats=})...")
+        imps = permutation_importance(
+            clf, X_test, y_test, n_repeats=n_repeats, n_jobs=n_jobs
+        )
         print(f"{imps=}")
+        return imps
 
 
 # Operators.
