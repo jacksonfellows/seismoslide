@@ -1,3 +1,4 @@
+import graphviz
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -21,3 +22,26 @@ def plot_feature_importances(fs):
     C = plt.bar(x, imps.importances_mean, yerr=imps.importances_std)
     plt.bar_label(C, labels)
     plt.show()
+
+
+def graphviz_feature(feature):
+    G = graphviz.Graph()
+    i = 0
+
+    def C():
+        nonlocal i
+        i += 1
+        return str(i)
+
+    def rec(t):
+        id = C()
+        match t:
+            case (f, *x):
+                G.node(id, label=f)
+                G.edges((id, rec(x_)) for x_ in x)
+            case x:
+                G.node(id, label=x)
+        return id
+
+    rec(feature)
+    return G
