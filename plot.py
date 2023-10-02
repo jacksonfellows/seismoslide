@@ -5,10 +5,11 @@ from matplotlib import pyplot as plt
 
 from evolve import default_evolver
 
-df = pd.read_csv("n_random_features_vs_model_score_cleanup.csv")
+df1 = pd.read_csv("n_random_features_vs_model_score_cleanup.csv")
+df2 = pd.read_csv("n_random_features_vs_model_score_2.csv")
 
 
-def p():
+def p(df):
     plt.plot(df.n_random_features, df.model_score, "x")
     plt.xlabel("# of Random Features (max_depth=5, terminal_proba=0.3)")
     plt.ylabel("Model Performance (n_splits=8, test_size=0.25)")
@@ -45,3 +46,31 @@ def graphviz_feature(feature):
 
     rec(feature)
     return G
+
+
+def plot_features(X, y, c1, c2):
+    X0 = X[y == 0]
+    X1 = X[y == 1]
+    # TODO: Make sure labels match.
+    plt.scatter(
+        X0[:, c1], X0[:, c2], color="red", facecolors="none", label="earthquake"
+    )
+    plt.scatter(
+        X1[:, c1], X1[:, c2], color="blue", facecolors="none", label="surface event"
+    )
+    plt.legend()
+    plt.show()
+
+
+def plot_waveform(W, i, components=None):
+    sampling_rate = 100
+    ws = W[i]
+    x = np.arange(ws.shape[1]) / sampling_rate
+    if components is None:
+        components = "ZNE"
+    for i, l in enumerate("ZNE"):
+        if l in components:
+            plt.plot(x, ws[i], label=l)
+    plt.xlabel("Time (s)")
+    plt.legend()
+    plt.show()
