@@ -8,6 +8,7 @@ import pandas as pd
 import scipy
 import seisbench.data
 from obspy import UTCDateTime
+from obspy.signal.filter import bandpass
 
 
 def shift_P_arrival(
@@ -30,7 +31,10 @@ def normalize(waveform):
     """Normalize a waveform for testing/prediction."""
     normalized = scipy.signal.detrend(waveform)  # Should I also remove mean?
     normalized /= np.std(normalized)  # std vs max?
-    # Should I bandpass?
+    # Same frequency range as EQTransformer.
+    normalized = bandpass(
+        normalized, freqmin=1, freqmax=45, df=100, corners=2, zerophase=True
+    )
     return normalized
 
 
