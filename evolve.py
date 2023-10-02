@@ -44,23 +44,26 @@ class Evolver:
             "E": W[:, 2],
         }
 
-    def simplify_feature(self, feature):
-        def rec(tree):
-            match tree:
-                case (f, *x):
-                    simplifieds, ranks = zip(*map(rec, x))
-                    max_rank = max(ranks)
-                    if max_rank == self.operators[f].cell_rank:
-                        # Would combine across traces - Not allowed.
-                        return simplifieds[0], max_rank
-                    if max_rank + self.operators[f].delta_rank < 1:
-                        # No-op.
-                        return simplifieds[0], max_rank
-                    return (f, *simplifieds), max_rank + self.operators[f].delta_rank
-                case x:
-                    return x, len(self.terminals[x].shape)
+    def simplify_feature_rec(self, feature):
+        match feature:
+            case (f, *x):
+                simplifieds, ranks = zip(*map(self.simplify_feature_rec, x))
+                max_rank = max(ranks)
+                if max_rank == self.operators[f].cell_rank:
+                    # Would combine across traces - Not allowed.
+                    return simplifieds[0], max_rank
+                if max_rank + self.operators[f].delta_rank < 1:
+                    # No-op.
+                    return simplifieds[0], max_rank
+                return (f, *simplifieds), max_rank + self.operators[f].delta_rank
+            case x:
+                return x, len(self.terminals[x].shape)
 
-        return rec(feature)[0]
+    def simplify_feature(self, feature):
+        return self.simplify_feature_rec(feature)[0]
+
+    def feature_rank(self, feature):
+        return self.simplify_feature_rec(feature)[1] - 1
 
     @lru_cache(maxsize=64)  # TODO: This is not the optimal caching strategy.
     def eval_feature_rec(self, feature):
@@ -100,7 +103,10 @@ class Evolver:
         print("calculating mutual info...")
         mi = mutual_info_classif(X, self.y, random_state=RANDOM_STATE)
         n_subtrees = np.array([self.count_subtrees(f) for f in features])
-        return np.clip(mi - 0.1 / (1 + np.exp(5 - 0.4 * n_subtrees)), 0, None)
+        ranks = np.array([self.feature_rank(f) for f in features])
+        depth_penalty = 0.3 / (1 + np.exp(10 - 0.6 * n_subtrees))
+        rank_penalty = 0.3 * (ranks != 0)
+        return np.clip(mi - depth_penalty - rank_penalty, 0, None)
 
     def score_features_similarity(self, features, existing_features):
         A = self.eval_features(features)
@@ -116,7 +122,7 @@ class Evolver:
         simil = self.score_features_similarity(
             features, existing_features
         )  # absolute correlation [0,1]
-        return np.clip(score - 0.17 * simil, 0, None)
+        return np.clip(score - 0.3 * simil, 0, None)
 
     def random_feature(self, max_depth, terminal_proba):
         if max_depth == 0 or random.random() < terminal_proba:
@@ -315,7 +321,11 @@ def make_same_rank(f):
 
 
 @make_same_rank
-def safe_sum(x, y):
+def safe_add(x, y):
+    if x.shape[-1] < y.shape[-1]:
+        y = y[..., : x.shape[-1]]
+    elif y.shape[-1] < x.shape[-1]:
+        x = x[..., : y.shape[-1]]
     return x + y
 
 
@@ -325,6 +335,24 @@ def safe_correlate(x, y):
     for i in np.ndindex(res.shape[:-1]):
         res[i] = scipy.signal.correlate(x[i], y[i], mode="same")
     return res
+
+
+def first_half(x):
+    if x.shape[-1] == 1:
+        return x
+    return x[..., : x.shape[-1] // 2]
+
+
+def second_half(x):
+    return x[..., x.shape[-1] // 2 :]
+
+
+def envelope(x):
+    return np.abs(scipy.signal.hilbert(x, axis=-1))
+
+
+def periodogram(x):
+    return scipy.signal.periodogram(x, axis=-1)[1]
 
 
 dataset = seisbench.data.WaveformDataset(
@@ -364,8 +392,19 @@ default_evolver = Evolver(
         # "im_fft": OperatorDef(
         #     arity=1, delta_rank=0, cell_rank=1, apply=lambda x: np.imag(scipy.fft.fft(x, axis=-1))
         # ),
-        "+": OperatorDef(arity=2, delta_rank=0, cell_rank=0, apply=safe_sum),
+        "+": OperatorDef(arity=2, delta_rank=0, cell_rank=0, apply=safe_add),
         "corr": OperatorDef(arity=2, delta_rank=0, cell_rank=1, apply=safe_correlate),
+        "first_half": OperatorDef(arity=1, delta_rank=0, cell_rank=1, apply=first_half),
+        "second_half": OperatorDef(
+            arity=1, delta_rank=0, cell_rank=1, apply=second_half
+        ),
+        "sum": OperatorDef(
+            arity=1, delta_rank=-1, cell_rank=1, apply=lambda x: np.sum(x, axis=-1)
+        ),
+        "envelope": OperatorDef(arity=1, delta_rank=0, cell_rank=1, apply=envelope),
+        "periodogram": OperatorDef(
+            arity=1, delta_rank=0, cell_rank=1, apply=periodogram
+        ),
     },
 )
 
@@ -393,16 +432,17 @@ def benchmark_default_single():
 def benchmark_default():
     start_t = time.time()
     params = EvolutionParameters(
-        pop_size=50,
+        pop_size=40,
         n_keep_best=5,
         crossover_rate=0.5,
         mutation_rate=0.4,
-        max_depth=5,
-        n_generations=10,
-        terminal_proba=0.5,
+        max_depth=10,
+        n_generations=20,
+        terminal_proba=0.3,
     )
     n_features = 30
     print(f"{params=} {n_features=}")
     fs = default_evolver.meta_evolve_features(params, n_features)
+    print(f"{fs=}")
     default_evolver.score_model(fs)
     print(f"took {time.time() - start_t} s")
