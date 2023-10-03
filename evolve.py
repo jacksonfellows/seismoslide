@@ -8,6 +8,7 @@ import numpy as np
 import scipy
 import seisbench.data
 from matplotlib import pyplot as plt
+from obspy.signal.filter import bandpass
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_selection import mutual_info_classif
 from sklearn.inspection import permutation_importance
@@ -355,6 +356,10 @@ def periodogram(x):
     return scipy.signal.periodogram(x, axis=-1)[1]
 
 
+def make_bandpass_operator(freqmin, freqmax):
+    return lambda x: bandpass(x, freqmin, freqmax, df=100, corners=2, zerophase=True)
+
+
 dataset = seisbench.data.WaveformDataset(
     Path.home() / ".seisbench/datasets/seismoslide_1"
 )
@@ -404,6 +409,18 @@ default_evolver = Evolver(
         "envelope": OperatorDef(arity=1, delta_rank=0, cell_rank=1, apply=envelope),
         "periodogram": OperatorDef(
             arity=1, delta_rank=0, cell_rank=1, apply=periodogram
+        ),
+        "bp_1_3": OperatorDef(
+            arity=1, delta_rank=0, cell_rank=1, apply=make_bandpass_operator(1, 3)
+        ),
+        "bp_3_10": OperatorDef(
+            arity=1, delta_rank=0, cell_rank=1, apply=make_bandpass_operator(3, 10)
+        ),
+        "bp_10_20": OperatorDef(
+            arity=1, delta_rank=0, cell_rank=1, apply=make_bandpass_operator(10, 20)
+        ),
+        "bp_20_45": OperatorDef(
+            arity=1, delta_rank=0, cell_rank=1, apply=make_bandpass_operator(20, 45)
         ),
     },
 )
