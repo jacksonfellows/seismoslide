@@ -1,5 +1,6 @@
 import pandas as pd
 import seisbench.data
+from matplotlib import pyplot as plt
 
 pnw_exotic = seisbench.data.PNWExotic()
 pnw = seisbench.data.PNW()
@@ -43,3 +44,19 @@ def dump_surface_events_and_earthquakes():
         pnw.metadata[pnw.metadata.source_type == "earthquake"],
         "earthquake_event_counts.csv",
     )
+
+
+def plot_temporal_distrib():
+    pnw_exotic.metadata[
+        pnw_exotic.metadata.source_type == "surface event"
+    ].trace_start_time.str.slice(0, 4).astype(int).hist(bins=range(2000, 2024))
+    plt.xlabel("Year")
+    plt.ylabel("# of Surface Event Traces")
+    plt.show()
+
+    pnw.metadata[pnw.metadata.source_type == "earthquake"].trace_start_time.str.slice(
+        0, 4
+    ).astype(int).hist(bins=range(2000, 2024))
+    plt.xlabel("Year")
+    plt.ylabel("# of Earthquake Traces")
+    plt.show()
