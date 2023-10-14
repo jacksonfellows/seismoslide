@@ -1,6 +1,3 @@
-# Combine PNW and PNWExotic into one dataset with a equal number of
-# surface events and earthquakes.
-
 from pathlib import Path
 
 import numpy as np
@@ -51,9 +48,35 @@ def qualified_station_name(metadata):
 pnw_exotic = seisbench.data.PNWExotic()
 pnw = seisbench.data.PNW()
 
+np_gen = np.random.default_rng(123)
 
-def create_dataset():
-    base_path = Path.home() / ".seisbench/datasets/seismoslide_1"
+
+def save_event(waveform, metadata, writer, sampling_rate):
+    trace_P_arrival_sample = metadata.trace_P_arrival_sample
+    if np.isnan(trace_P_arrival_sample):
+        print("skipping event - no trace_P_arrival_sample")
+        return
+    shifted, shift_samples = shift_P_arrival(
+        waveform, trace_P_arrival_sample, sampling_rate=sampling_rate
+    )
+    normalized = normalize(shifted)
+    trace_start_time = (
+        UTCDateTime(metadata.trace_start_time) + shift_samples / sampling_rate
+    )
+    writer.add_trace(
+        {
+            "source_type": metadata.source_type,
+            "event_id": metadata.event_id,
+            "station_network_code": metadata.station_network_code,
+            "station_code": metadata.station_code,
+            "station_location_code": metadata.station_location_code,
+            "trace_start_time": trace_start_time,
+        },
+        normalized,
+    )
+
+
+def write_split(i_eq, i_su, base_path):
     metadata_path = base_path / "metadata.csv"
     waveforms_path = base_path / "waveforms.hdf5"
     with seisbench.data.WaveformDataWriter(metadata_path, waveforms_path) as writer:
@@ -63,53 +86,61 @@ def create_dataset():
             "component_order": "ZNE",
             "sampling_rate": sampling_rate,
         }
+        for indices, dataset in zip([i_eq, i_su], [pnw, pnw_exotic]):
+            for i in indices:
+                save_event(
+                    dataset.get_waveforms(i),
+                    dataset.metadata.loc[i],
+                    writer,
+                    sampling_rate,
+                )
 
-        def save_event(waveform, metadata):
-            trace_P_arrival_sample = metadata.trace_P_arrival_sample
-            if np.isnan(trace_P_arrival_sample):
-                print("skipping event - no trace_P_arrival_sample")
-                return
-            shifted, shift_samples = shift_P_arrival(
-                waveform, trace_P_arrival_sample, sampling_rate=sampling_rate
-            )
-            normalized = normalize(shifted)
-            trace_start_time = (
-                UTCDateTime(metadata.trace_start_time) + shift_samples / sampling_rate
-            )
-            writer.add_trace(
-                {
-                    "source_type": metadata.source_type,
-                    "event_id": metadata.event_id,
-                    "station_network_code": metadata.station_network_code,
-                    "station_code": metadata.station_code,
-                    "station_location_code": metadata.station_location_code,
-                    "trace_start_time": trace_start_time,
-                },
-                normalized,
-            )
 
-        surface_events = pnw_exotic.metadata[
-            pnw_exotic.metadata.source_type == "surface event"
-        ]
-        earthquakes = pnw.metadata[pnw.metadata.source_type == "earthquake"]
-        surface_event_stations = qualified_station_name(surface_events)
-        earthquake_stations = qualified_station_name(earthquakes)
-        for station, count in surface_event_stations.value_counts().items():
-            possible_surface_events = surface_events[surface_event_stations == station]
-            possible_earthquakes = earthquakes[earthquake_stations == station]
-            if len(possible_earthquakes) < count:
-                count = len(possible_earthquakes)
-            sampled_surface_events = possible_surface_events.sample(n=count)
-            sampled_earthquakes = possible_earthquakes.sample(n=count)
-            assert (
-                (qualified_station_name(sampled_surface_events) == station).all()
-                and (qualified_station_name(sampled_earthquakes) == station).all()
-                and len(sampled_surface_events) == len(sampled_earthquakes) == count
-            )
-            print(
-                f"sampling {count} surface events and {count} earthquakes from station {station}"
-            )
-            for i, row in sampled_surface_events.iterrows():
-                save_event(pnw_exotic.get_waveforms(i), row)
-            for i, row in sampled_earthquakes.iterrows():
-                save_event(pnw.get_waveforms(i), row)
+def make_splits(split_dir):
+    all_su = pnw_exotic.metadata[pnw_exotic.metadata.source_type == "surface event"]
+    all_eq = pnw.metadata[pnw.metadata.source_type == "earthquake"]
+
+    q_eq = qualified_station_name(all_eq)
+    q_su = qualified_station_name(all_su)
+
+    # Awful.
+    counts_eq = q_eq.to_frame().join(
+        q_su.value_counts().reindex(q_eq.unique(), fill_value=0), on=0
+    )["count"]
+
+    p = counts_eq.to_numpy()
+    p = p / p.sum()
+
+    # Earthquake indices: Random choice weighed by # of surface events/station.
+    i_eq = np_gen.choice(all_eq.index.to_numpy(), size=len(all_su), replace=False, p=p)
+
+    # Surface event indices: Random permutation of all events.
+    i_su = np_gen.permutation(all_su.index.to_numpy())
+
+    assert i_eq.shape == i_su.shape
+
+    # Split percentages:
+    train_p, valid_p, test_p = 0.6, 0.3, 0.1
+    assert train_p * 100 + valid_p * 100 + test_p * 100 == 100
+    train_i_eq, valid_i_eq, test_i_eq = np.array_split(
+        i_eq, [int(train_p * len(i_eq)), int((train_p + valid_p) * len(i_eq))]
+    )
+    train_i_su, valid_i_su, test_i_su = np.array_split(
+        i_su, [int(train_p * len(i_su)), int((train_p + valid_p) * len(i_su))]
+    )
+
+    write_split(train_i_eq, train_i_su, split_dir / "train")
+    write_split(valid_i_eq, valid_i_su, split_dir / "valid")
+    write_split(test_i_eq, test_i_su, split_dir / "test")
+
+
+def create_splits():
+    split_dir = Path("./pnw_splits")
+    if split_dir.exists():
+        raise ValueError(f"directory {split_dir} already exists")
+    split_dir.mkdir()
+    make_splits(split_dir)
+
+
+if __name__ == "__main__":
+    create_splits()
