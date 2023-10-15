@@ -1,7 +1,7 @@
 import random
 import time
 from collections import namedtuple
-from functools import lru_cache
+from functools import cache, lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -265,73 +265,45 @@ class Evolver:
             existing_features.append(new_feature)
         return existing_features
 
-    def score_model(self, features, n_jobs=None):
-        print("computing X...")
-        X = self.eval_features(features)
-        clf = RandomForestClassifier(1000, random_state=RANDOM_STATE)
-        n_splits = 8
-        test_size = 0.25
-        print(f"cross validating model (shuffle splits, {n_splits=}, {test_size=})")
-        scores = cross_val_score(
-            clf,
-            X,
-            self.y,
-            cv=ShuffleSplit(n_splits=n_splits, test_size=test_size),
-            n_jobs=n_jobs,
-        )
-        mean_score = scores.mean()
-        print(f"mean score={mean_score}")
-        return mean_score
 
-    def calculate_permutation_importances(self, features, n_jobs=None):
-        print("computing X...")
-        X = self.eval_features(features)
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, self.y, random_state=RANDOM_STATE
-        )
-        print("fitting model...")
-        clf = RandomForestClassifier(1000, random_state=RANDOM_STATE)
-        clf.fit(X_train, y_train)
-        print("scoring model...")
-        score = clf.score(X_test, y_test)
-        print(f"{score=}")
-        n_repeats = 8
+def score_model(
+    evolver_train,
+    evolver_test,
+    features,
+    n_trees=1000,
+    n_jobs=None,
+    calculate_permutation_importances=False,
+    n_repeats=8,
+):
+    print("computing train X...")
+    X_train = evolver_train.eval_features(features)
+    y_train = evolver_train.y
+    print("computing test X...")
+    X_test = evolver_test.eval_features(features)
+    y_test = evolver_test.y
+    print("fitting random forest...")
+    clf = RandomForestClassifier(n_trees, random_state=RANDOM_STATE)
+    clf.fit(X_train, y_train)
+    print("scoring random forest...")
+    score = clf.score(X_test, y_test)
+    print(f"score={score:0.4f}")
+    if calculate_permutation_importances:
         print(f"calculating permutation importances ({n_repeats=})...")
         imps = permutation_importance(
             clf, X_test, y_test, n_repeats=n_repeats, n_jobs=n_jobs
         )
-        print(f"{imps=}")
         return imps
+    return score
 
 
-dataset = seisbench.data.WaveformDataset(
-    Path.home() / ".seisbench/datasets/seismoslide_1"
-)
-default_evolver = Evolver(
-    W=dataset.get_waveforms(mask=np.ones(len(dataset), dtype=bool)),
-    y=(dataset.metadata.source_type == "surface event").to_numpy(dtype=int),
-    operators=all_operators,
-)
-
-
-def benchmark_default_single():
-    start_t = time.time()
-    params = EvolutionParameters(
-        pop_size=40,
-        n_keep_best=10,
-        crossover_rate=0.4,
-        mutation_rate=0.4,
-        max_depth=7,
-        n_generations=30,
-        terminal_proba=0.5,
+@cache
+def load_evolver(split):
+    dataset = seisbench.data.WaveformDataset(f"./pnw_splits/{split}")
+    return Evolver(
+        W=dataset.get_waveforms(mask=np.ones(len(dataset), dtype=bool)),
+        y=(dataset.metadata.source_type == "surface event").to_numpy(dtype=int),
+        operators=all_operators,
     )
-    print(f"{params=}")
-    fs = default_evolver.evolve_features(
-        params, fitness_f=default_evolver.score_features
-    )
-    best_feature = default_evolver.simplify_feature(fs[0])
-    print(f"best feature: {best_feature}")
-    print(f"took {time.time() - start_t} s")
 
 
 def benchmark_default():
@@ -347,7 +319,9 @@ def benchmark_default():
     )
     n_features = 30
     print(f"{params=} {n_features=}")
-    fs = default_evolver.meta_evolve_features(params, n_features)
+    train = load_evolver("train")
+    valid = load_evolver("valid")
+    fs = train.meta_evolve_features(params, n_features)
     print(f"{fs=}")
-    default_evolver.score_model(fs)
+    score_model(train, valid)
     print(f"took {time.time() - start_t} s")
