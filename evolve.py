@@ -10,7 +10,6 @@ from matplotlib import pyplot as plt
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_selection import mutual_info_classif
 from sklearn.inspection import permutation_importance
-from sklearn.model_selection import ShuffleSplit, cross_val_score, train_test_split
 
 from operators import all_operators
 
@@ -27,15 +26,31 @@ EvolutionParameters = namedtuple(
         "max_depth",
         "n_generations",
         "terminal_proba",
+        "should_contain",
     ),
 )
 
 
+def feature_contains(feature, operator):
+    match feature:
+        case (f, *x):
+            if f == operator or (
+                type(operator) in {set, tuple, list} and f in operator
+            ):
+                return True
+            return any(feature_contains(x_, operator) for x_ in x)
+        case x:  # Don't count terminals.
+            return False
+
+
 class Evolver:
-    def __init__(self, W, y, operators):
+    def __init__(self, W, y, operators, operator_weights=None):
         self.W = W
         self.y = y
         self.operators = operators
+        self.operator_weights = (
+            [1 for _ in operators] if operator_weights is None else operator_weights
+        )
         # Hard-code for now.
         self.terminals = {
             "Z": W[:, 0],
@@ -97,7 +112,7 @@ class Evolver:
             X[:, i] = self.eval_feature(feature)
         return X
 
-    def score_features(self, features):
+    def score_features(self, features, should_contain=None):
         X = self.eval_features(features)
         print("calculating mutual info...")
         mi = mutual_info_classif(X, self.y, random_state=RANDOM_STATE)
@@ -105,7 +120,17 @@ class Evolver:
         ranks = np.array([self.feature_rank(f) for f in features])
         depth_penalty = 0.3 / (1 + np.exp(10 - 0.6 * n_subtrees))
         rank_penalty = 0.3 * (ranks != 0)
-        return np.clip(mi - depth_penalty - rank_penalty, 0, None)
+        scores = mi - depth_penalty - rank_penalty
+        if should_contain is not None:
+            contains_penalty = 0.5 * np.array(
+                [
+                    not feature_contains(self.simplify_feature(f), should_contain)
+                    for f in features
+                ],
+                dtype=float,
+            )
+            scores -= contains_penalty
+        return np.clip(scores, 0, None)
 
     def score_features_similarity(self, features, existing_features):
         A = self.eval_features(features)
@@ -114,8 +139,10 @@ class Evolver:
         # Does max make sense?
         return C[: len(features), -len(existing_features) :].max(axis=-1)
 
-    def score_features_with_existing(self, features, existing_features):
-        score = self.score_features(features)  # mutual importance
+    def score_features_with_existing(
+        self, features, existing_features, should_contain=None
+    ):
+        score = self.score_features(features, should_contain)  # mutual importance
         if len(existing_features) == 0:
             return score
         simil = self.score_features_similarity(
@@ -123,10 +150,23 @@ class Evolver:
         )  # absolute correlation [0,1]
         return np.clip(score - 0.3 * simil, 0, None)
 
+    def random_operator(self, operators=None):
+        if operators is None:
+            operators = list(self.operators.keys())
+        return random.choices(
+            operators,
+            weights=[
+                w
+                for o, w in zip(self.operators.keys(), self.operator_weights)
+                if o in operators
+            ],
+            k=1,
+        )[0]
+
     def random_feature(self, max_depth, terminal_proba):
         if max_depth == 0 or random.random() < terminal_proba:
             return random.choice(list(self.terminals.keys()))
-        head = random.choice(list(self.operators.keys()))
+        head = self.random_operator()
         return (
             head,
             *[
@@ -140,7 +180,7 @@ class Evolver:
             case (f, *x):
                 if random.random() < p:
                     return (
-                        random.choice(
+                        self.random_operator(
                             [
                                 op
                                 for op, d in self.operators.items()
@@ -257,7 +297,7 @@ class Evolver:
             new_feature = self.evolve_features(
                 parameters,
                 fitness_f=lambda x: self.score_features_with_existing(
-                    x, existing_features
+                    x, existing_features, parameters.should_contain
                 ),
             )[0]
             new_feature = self.simplify_feature(new_feature)
@@ -309,19 +349,20 @@ def load_evolver(split):
 def benchmark_default():
     start_t = time.time()
     params = EvolutionParameters(
-        pop_size=40,
-        n_keep_best=5,
+        pop_size=20,
+        n_keep_best=2,
         crossover_rate=0.5,
         mutation_rate=0.4,
         max_depth=10,
         n_generations=20,
         terminal_proba=0.3,
+        should_contain={"first_half", "second_half"},
     )
-    n_features = 30
+    n_features = 15
     print(f"{params=} {n_features=}")
     train = load_evolver("train")
     valid = load_evolver("valid")
     fs = train.meta_evolve_features(params, n_features)
     print(f"{fs=}")
-    score_model(train, valid)
+    score_model(train, valid, fs)
     print(f"took {time.time() - start_t} s")
