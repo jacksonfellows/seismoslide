@@ -67,6 +67,12 @@ def explore_feature(feature, log=False, alpha=0.1):
             axs[i].bar(
                 np.arange(X.shape[0]), X[ii], color=[y_to_color(y) for y in E.y[ii]]
             )
+        elif len(X.shape) == 3:
+            # Not perfect.
+            red = np.mean(X[E.y == 0], axis=0)
+            blu = np.mean(X[E.y == 1], axis=0)
+            axs[i].imshow(np.rot90(red), cmap="Reds", alpha=0.6)
+            axs[i].imshow(np.rot90(blu), cmap="Blues", alpha=0.6)
         else:
             raise ValueError(f"rank {len(X.shape)} not supported")
     plt.show()
