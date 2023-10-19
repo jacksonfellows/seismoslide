@@ -32,6 +32,16 @@ def safe_add(x, y):
 
 
 @make_same_dims
+def safe_sub(x, y):
+    return x - y
+
+
+@make_same_dims
+def safe_div(x, y):
+    return x / y
+
+
+@make_same_dims
 def safe_correlate(x, y):
     res = np.empty_like(x)
     for i in np.ndindex(res.shape[:-1]):
@@ -59,6 +69,16 @@ def periodogram(x):
 
 def make_bandpass_operator(freqmin, freqmax):
     return lambda x: bandpass(x, freqmin, freqmax, df=100, corners=2, zerophase=True)
+
+
+def num_peaks(x):
+    """Number of peaks above 75% of the maximum absolute value."""
+    # Seems to be what Hibert et. al. do for at least some of their peak counts.
+    return np.apply_along_axis(
+        lambda y: scipy.signal.find_peaks(y, height=0.75 * np.abs(y).max())[0].shape[0],
+        -1,
+        x,
+    )
 
 
 all_operators = {
@@ -104,13 +124,15 @@ all_operators = {
         cell_rank=1,
         apply=lambda x: np.real(scipy.fft.fft(x, axis=-1)),
     ),
-    # "im_fft": OperatorDef(
-    #     arity=1,
-    #     delta_rank=0,
-    #     cell_rank=1,
-    #     apply=lambda x: np.imag(scipy.fft.fft(x, axis=-1)),
-    # ),
+    "im_fft": OperatorDef(
+        arity=1,
+        delta_rank=0,
+        cell_rank=1,
+        apply=lambda x: np.imag(scipy.fft.fft(x, axis=-1)),
+    ),
     "+": OperatorDef(arity=2, delta_rank=0, cell_rank=0, apply=safe_add),
+    "-": OperatorDef(arity=2, delta_rank=0, cell_rank=0, apply=safe_sub),
+    # "/": OperatorDef(arity=2, delta_rank=0, cell_rank=0, apply=safe_div),
     "corr": OperatorDef(arity=2, delta_rank=0, cell_rank=1, apply=safe_correlate),
     "first_half": OperatorDef(arity=1, delta_rank=0, cell_rank=1, apply=first_half),
     "second_half": OperatorDef(arity=1, delta_rank=0, cell_rank=1, apply=second_half),
@@ -135,9 +157,7 @@ all_operators = {
         arity=1,
         delta_rank=-1,
         cell_rank=1,
-        apply=lambda x: np.apply_along_axis(
-            lambda y: scipy.signal.find_peaks(y)[0].shape[0], -1, x
-        ),
+        apply=num_peaks,
     ),
     "spectrogram": OperatorDef(
         arity=1,

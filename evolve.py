@@ -23,6 +23,7 @@ EvolutionParameters = namedtuple(
         "n_keep_best",
         "crossover_rate",
         "mutation_rate",
+        "subtree_mutation_rate",
         "max_depth",
         "n_generations",
         "terminal_proba",
@@ -41,6 +42,36 @@ def feature_contains(feature, operator):
             return any(feature_contains(x_, operator) for x_ in x)
         case x:  # Don't count terminals.
             return False
+
+
+def feature_repeated_bandpass(feature):
+    # Kind of silly.
+    match feature:
+        case (f, *x):
+            if f.startswith("bp_") and x[0][0].startswith("bp_"):
+                return True
+            return any(feature_repeated_bandpass(x_) for x_ in x)
+        case _:
+            return False
+
+
+def count_subtrees(feature):
+    match feature:
+        case (_, *x):
+            return 1 + sum(map(count_subtrees, x))
+        case x:
+            return 1
+
+
+def feature_max_depth(feature):
+    def rec(tree, depth):
+        match tree:
+            case (_, *x):
+                return max(rec(x_, depth + 1) for x_ in x)
+            case _:
+                return depth
+
+    return rec(feature, 0)
 
 
 class Evolver:
@@ -116,11 +147,15 @@ class Evolver:
         X = self.eval_features(features)
         print("calculating mutual info...")
         mi = mutual_info_classif(X, self.y, random_state=RANDOM_STATE)
-        n_subtrees = np.array([self.count_subtrees(f) for f in features])
+        n_subtrees = np.array([count_subtrees(f) for f in features])
         ranks = np.array([self.feature_rank(f) for f in features])
         depth_penalty = 0.3 / (1 + np.exp(10 - 0.6 * n_subtrees))
         rank_penalty = 0.3 * (ranks != 0)
-        scores = mi - depth_penalty - rank_penalty
+        repeated_bandpass_penalty = 0.5 * np.array(
+            [feature_repeated_bandpass(self.simplify_feature(f)) for f in features],
+            dtype=float,
+        )
+        scores = mi - depth_penalty - rank_penalty - repeated_bandpass_penalty
         if should_contain is not None:
             contains_penalty = 0.5 * np.array(
                 [
@@ -175,6 +210,12 @@ class Evolver:
             ],
         )
 
+    def subtree_mutate_feature(self, feature, terminal_proba):
+        i = random.randrange(count_subtrees(feature))
+        max_depth = feature_max_depth(self.get_subtree(feature, i))
+        random_subtree = self.random_feature(max_depth, terminal_proba)
+        return self.swap_subtree(feature, i, random_subtree)
+
     def point_mutate_feature(self, feature, p=0.3):
         match feature:
             case (f, *x):
@@ -195,13 +236,6 @@ class Evolver:
                     return random.choice(list(self.terminals.keys()))
                 else:
                     return x
-
-    def count_subtrees(self, feature):
-        match feature:
-            case (_, *x):
-                return 1 + sum(map(self.count_subtrees, x))
-            case x:
-                return 1
 
     def get_subtree(self, feature, index):
         # Kind of ugly.
@@ -244,8 +278,8 @@ class Evolver:
         return rec(feature)
 
     def crossover(self, feature1, feature2):
-        i1 = random.randrange(self.count_subtrees(feature1))
-        i2 = random.randrange(self.count_subtrees(feature2))
+        i1 = random.randrange(count_subtrees(feature1))
+        i2 = random.randrange(count_subtrees(feature2))
         subtree1 = self.get_subtree(feature1, i1)
         subtree2 = self.get_subtree(feature2, i2)
         return self.swap_subtree(feature1, i1, subtree2), self.swap_subtree(
@@ -282,6 +316,13 @@ class Evolver:
                     new_population.append(
                         self.point_mutate_feature(
                             random.choices(population, weights=fitnesses, k=1)[0]
+                        )
+                    )
+                elif random.random() < parameters.subtree_mutation_rate:
+                    new_population.append(
+                        self.subtree_mutate_feature(
+                            random.choices(population, weights=fitnesses, k=1)[0],
+                            parameters.terminal_proba,
                         )
                     )
                 else:
@@ -321,7 +362,7 @@ def score_model(
     print("computing test X...")
     X_test = evolver_test.eval_features(features)
     y_test = evolver_test.y
-    print("fitting random forest...")
+    print(f"fitting random forest ({n_trees=})...")
     clf = RandomForestClassifier(n_trees, random_state=RANDOM_STATE)
     clf.fit(X_train, y_train)
     print("scoring random forest...")
@@ -344,25 +385,3 @@ def load_evolver(split):
         y=(dataset.metadata.source_type == "surface event").to_numpy(dtype=int),
         operators=all_operators,
     )
-
-
-def benchmark_default():
-    start_t = time.time()
-    params = EvolutionParameters(
-        pop_size=20,
-        n_keep_best=2,
-        crossover_rate=0.5,
-        mutation_rate=0.4,
-        max_depth=10,
-        n_generations=20,
-        terminal_proba=0.3,
-        should_contain={"first_half", "second_half"},
-    )
-    n_features = 15
-    print(f"{params=} {n_features=}")
-    train = load_evolver("train")
-    valid = load_evolver("valid")
-    fs = train.meta_evolve_features(params, n_features)
-    print(f"{fs=}")
-    score_model(train, valid, fs)
-    print(f"took {time.time() - start_t} s")
