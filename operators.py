@@ -132,6 +132,7 @@ all_operators = {
     ),
     "+": OperatorDef(arity=2, delta_rank=0, cell_rank=0, apply=safe_add),
     "-": OperatorDef(arity=2, delta_rank=0, cell_rank=0, apply=safe_sub),
+    "abs": OperatorDef(arity=1, delta_rank=0, cell_rank=0, apply=np.abs),
     # "/": OperatorDef(arity=2, delta_rank=0, cell_rank=0, apply=safe_div),
     "corr": OperatorDef(arity=2, delta_rank=0, cell_rank=1, apply=safe_correlate),
     "first_half": OperatorDef(arity=1, delta_rank=0, cell_rank=1, apply=first_half),
