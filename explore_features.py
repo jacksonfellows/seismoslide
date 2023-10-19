@@ -11,7 +11,7 @@ from operators import all_operators
 @cache
 def load_explore_evolver():
     dataset = seisbench.data.WaveformDataset("./pnw_splits/train")
-    i = np.random.choice(np.arange(10630), 200)
+    i = np.random.choice(np.arange(10630), 400)
     return Evolver(
         W=dataset.get_waveforms(i),
         y=(dataset.metadata.source_type == "surface event").to_numpy(dtype=int)[i],
@@ -52,16 +52,18 @@ def eval_subfeatures(feature):
                 yield from eval_subfeatures(x_)
 
 
-def explore_feature(feature):
+def explore_feature(feature, log=False, alpha=0.1):
     subs = list(eval_subfeatures(feature))
     fig, axs = plt.subplots(nrows=len(subs), ncols=1)
     for i, (sub, X) in enumerate(subs):
         axs[i].set_title(sub)
         if len(X.shape) == 2:
             for event_i in range(X.shape[0]):
-                axs[i].plot(X[event_i], color=y_to_color(E.y[event_i]), alpha=0.5)
+                axs[i].plot(X[event_i], color=y_to_color(E.y[event_i]), alpha=alpha)
         elif len(X.shape) == 1:
             ii = np.argsort(X)
+            if log:
+                axs[i].set_yscale("symlog")
             axs[i].bar(
                 np.arange(X.shape[0]), X[ii], color=[y_to_color(y) for y in E.y[ii]]
             )
