@@ -54,7 +54,14 @@ def eval_subfeatures(feature):
 
 
 def explore_feature(feature, log=False, alpha=0.1, path=None):
-    subs = list(eval_subfeatures(feature))
+    rep_subs = list(eval_subfeatures(feature))
+    seen = set()
+    subs = []
+    for sub, X in reversed(rep_subs):
+        if sub not in seen:
+            subs.append((sub, X))
+            seen.add(sub)
+    subs = list(reversed(subs))
     fig, axs = plt.subplots(
         nrows=len(subs), ncols=1, figsize=(8.5, 11) if path is not None else None
     )
