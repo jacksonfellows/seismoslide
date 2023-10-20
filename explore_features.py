@@ -1,5 +1,6 @@
 from functools import cache
 
+import matplotlib.patches as mpatches
 import numpy as np
 import seisbench.data
 from matplotlib import pyplot as plt
@@ -52,9 +53,11 @@ def eval_subfeatures(feature):
                 yield from eval_subfeatures(x_)
 
 
-def explore_feature(feature, log=False, alpha=0.1):
+def explore_feature(feature, log=False, alpha=0.1, path=None):
     subs = list(eval_subfeatures(feature))
-    fig, axs = plt.subplots(nrows=len(subs), ncols=1)
+    fig, axs = plt.subplots(
+        nrows=len(subs), ncols=1, figsize=(8.5, 11) if path is not None else None
+    )
     for i, (sub, X) in enumerate(subs):
         axs[i].set_title(sub)
         if len(X.shape) == 2:
@@ -75,4 +78,13 @@ def explore_feature(feature, log=False, alpha=0.1):
             axs[i].imshow(np.rot90(blu), cmap="Blues", alpha=0.6)
         else:
             raise ValueError(f"rank {len(X.shape)} not supported")
-    plt.show()
+    fig.legend(
+        handles=[
+            mpatches.Patch(color=c, label=l)
+            for c, l in zip(["red", "blue"], ["earthquake", "surface event"])
+        ]
+    )
+    if path is not None:
+        plt.savefig(path)
+    else:
+        plt.show()
