@@ -75,7 +75,10 @@ def explore_feature(feature, log=False, alpha=0.1, path=None):
             if log:
                 axs[i].set_yscale("symlog")
             axs[i].bar(
-                np.arange(X.shape[0]), X[ii], color=[y_to_color(y) for y in E.y[ii]]
+                np.arange(X.shape[0]),
+                X[ii],
+                color=[y_to_color(y) for y in E.y[ii]],
+                width=1.0,
             )
         elif len(X.shape) == 3:
             # Not perfect.
