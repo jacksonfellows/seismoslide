@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
-from evolve import default_evolver
+from evolve import load_evolver, score_model
 
 df1 = pd.read_csv("n_random_features_vs_model_score_cleanup.csv")
 df2 = pd.read_csv("n_random_features_vs_model_score_2.csv")
@@ -17,8 +17,14 @@ def p(df):
 
 
 def plot_feature_importances(fs):
-    labels = [repr(default_evolver.simplify_feature(f)) for f in fs]
-    imps = default_evolver.calculate_permutation_importances(fs, n_jobs=-1)
+    labels = fs
+    imps = score_model(
+        load_evolver("train"),
+        load_evolver("valid"),
+        fs,
+        n_jobs=-1,
+        calculate_permutation_importances=True,
+    )
     x = range(len(labels))
     C = plt.bar(x, imps.importances_mean, yerr=imps.importances_std)
     plt.bar_label(C, labels)
