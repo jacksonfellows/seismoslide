@@ -53,7 +53,7 @@ def eval_subfeatures(feature):
                 yield from eval_subfeatures(x_)
 
 
-def explore_feature(feature, log=False, alpha=0.1, path=None):
+def explore_feature(feature, log=False, alpha=0.1, path=None, add_min=False):
     rep_subs = list(eval_subfeatures(feature))
     seen = set()
     subs = []
@@ -76,7 +76,7 @@ def explore_feature(feature, log=False, alpha=0.1, path=None):
                 axs[i].set_yscale("symlog")
             axs[i].bar(
                 np.arange(X.shape[0]),
-                X[ii],
+                X[ii] + (X[ii].min() if add_min else 0),
                 color=[y_to_color(y) for y in E.y[ii]],
                 width=1.0,
             )
