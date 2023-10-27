@@ -112,26 +112,32 @@ all_operators = {
         cell_rank=1,
         apply=lambda x: scipy.stats.kurtosis(x, axis=-1),
     ),
-    "len": OperatorDef(
-        arity=1,
-        delta_rank=-1,
-        cell_rank=1,
-        apply=lambda x: np.full(x.shape[:-1], x.shape[-1]),
-    ),
-    "re_fft": OperatorDef(
+    # "len": OperatorDef(
+    #     arity=1,
+    #     delta_rank=-1,
+    #     cell_rank=1,
+    #     apply=lambda x: np.full(x.shape[:-1], x.shape[-1]),
+    # ),
+    # "re_fft": OperatorDef(
+    #     arity=1,
+    #     delta_rank=0,
+    #     cell_rank=1,
+    #     apply=lambda x: np.real(scipy.fft.rfft(x, axis=-1)),
+    # ),
+    # "im_fft": OperatorDef(
+    #     arity=1,
+    #     delta_rank=0,
+    #     cell_rank=1,
+    #     apply=lambda x: np.imag(scipy.fft.rfft(x, axis=-1)),
+    # ),
+    "abs_fft": OperatorDef(
         arity=1,
         delta_rank=0,
         cell_rank=1,
-        apply=lambda x: np.real(scipy.fft.rfft(x, axis=-1)),
-    ),
-    "im_fft": OperatorDef(
-        arity=1,
-        delta_rank=0,
-        cell_rank=1,
-        apply=lambda x: np.imag(scipy.fft.rfft(x, axis=-1)),
+        apply=lambda x: np.abs(scipy.fft.rfft(x, axis=-1)),
     ),
     "+": OperatorDef(arity=2, delta_rank=0, cell_rank=0, apply=safe_add),
-    "-": OperatorDef(arity=2, delta_rank=0, cell_rank=0, apply=safe_sub),
+    # "-": OperatorDef(arity=2, delta_rank=0, cell_rank=0, apply=safe_sub),
     "abs": OperatorDef(arity=1, delta_rank=0, cell_rank=0, apply=np.abs),
     # "/": OperatorDef(arity=2, delta_rank=0, cell_rank=0, apply=safe_div),
     "corr": OperatorDef(arity=2, delta_rank=0, cell_rank=1, apply=safe_correlate),
@@ -141,7 +147,7 @@ all_operators = {
         arity=1, delta_rank=-1, cell_rank=1, apply=lambda x: np.sum(x, axis=-1)
     ),
     "envelope": OperatorDef(arity=1, delta_rank=0, cell_rank=1, apply=envelope),
-    "periodogram": OperatorDef(arity=1, delta_rank=0, cell_rank=1, apply=periodogram),
+    # "periodogram": OperatorDef(arity=1, delta_rank=0, cell_rank=1, apply=periodogram),
     "bp_1_3": OperatorDef(
         arity=1, delta_rank=0, cell_rank=1, apply=make_bandpass_operator(1, 3)
     ),
@@ -154,16 +160,16 @@ all_operators = {
     "bp_20_45": OperatorDef(
         arity=1, delta_rank=0, cell_rank=1, apply=make_bandpass_operator(20, 45)
     ),
-    "num_peaks": OperatorDef(
-        arity=1,
-        delta_rank=-1,
-        cell_rank=1,
-        apply=num_peaks,
-    ),
-    "spectrogram": OperatorDef(
-        arity=1,
-        delta_rank=+1,
-        cell_rank=1,
-        apply=lambda x: scipy.signal.spectrogram(x, axis=-1)[2],
-    ),
+    # "num_peaks": OperatorDef(
+    #     arity=1,
+    #     delta_rank=-1,
+    #     cell_rank=1,
+    #     apply=num_peaks,
+    # ),
+    # "spectrogram": OperatorDef(
+    #     arity=1,
+    #     delta_rank=+1,
+    #     cell_rank=1,
+    #     apply=lambda x: scipy.signal.spectrogram(x, axis=-1)[2],
+    # ),
 }

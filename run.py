@@ -6,14 +6,14 @@ from evolve import *
 def run():
     start_t = time.time()
     params = EvolutionParameters(
-        pop_size=20,
-        n_keep_best=2,
+        pop_size=30,
+        n_keep_best=5,
         crossover_rate=0.4,
-        mutation_rate=0.3,
-        subtree_mutation_rate=0.1,
-        max_depth=10,
+        mutation_rate=0.2,
+        subtree_mutation_rate=0.4,
+        max_depth=5,
         n_generations=20,
-        terminal_proba=0.3,
+        terminal_proba=0.2,
         should_contain=None,
     )
     n_features = 20

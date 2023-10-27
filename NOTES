@@ -1,0 +1,13 @@
+Run with new fitness function, thirds:
+
+params=EvolutionParameters(pop_size=20, n_keep_best=5, crossover_rate=0.4, mutation_rate=0.2, subtree_mutation_rate=0.4, max_depth=5, n_generations=20, terminal_proba=0.2, should_contain=None) n_features=20
+
+fs=[('kurtosis', 'Z1'), ('+', ('argmax', 'E1'), ('max', 'Z2')), ('median', ('corr', ('corr', 'N', ('kurtosis', 'N')), ('kurtosis', 'N'))), ('skew', ('abs_fft', 'Z')), ('sum', ('first_half', ('first_half', 'E2'))), ('argmax', ('envelope', 'Z')), ('mean', 'N1'), ('mean', 'Z1'), ('sum', ('corr', ('first_half', 'E1'), ('kurtosis', 'E1'))), ('argmin', ('envelope', ('envelope', ('abs_fft', 'Z1')))), ('mean', ('corr', 'E', ('corr', 'N1', 'E'))), ('median', ('corr', ('sum', ('second_half', 'E')), 'N3')), ('sum', ('corr', ('kurtosis', ('second_half', 'Z1')), 'Z')), ('sum', ('first_half', ('second_half', ('corr', 'N2', 'E2')))), ('sum', ('first_half', 'N')), ('max', ('corr', 'N1', ('skew', 'N1'))), ('median', ('corr', 'E3', ('sum', 'E2'))), ('median', ('first_half', ('+', ('skew', 'Z1'), ('corr', 'N2', ('corr', 'N2', 'N'))))), ('max', ('corr', ('skew', 'Z'), ('+', ('second_half', 'Z1'), 'Z'))), ('mean', ('corr', ('mean', 'Z1'), 'Z2'))]
+computing train X...
+evaluating 20 features
+computing test X...
+evaluating 20 features
+fitting random forest (n_trees=1000)...
+scoring random forest...
+score=0.9217
+took 10912.783004045486 s

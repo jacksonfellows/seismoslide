@@ -1,3 +1,4 @@
+import itertools
 import random
 import time
 from collections import namedtuple
@@ -63,15 +64,15 @@ def count_subtrees(feature):
             return 1
 
 
-def feature_max_depth(feature):
-    def rec(tree, depth):
-        match tree:
-            case (_, *x):
-                return max(rec(x_, depth + 1) for x_ in x)
-            case _:
-                return depth
+# def feature_max_depth(feature):
+#     def rec(tree, depth):
+#         match tree:
+#             case (_, *x):
+#                 return max(rec(x_, depth + 1) for x_ in x)
+#             case _:
+#                 return depth
 
-    return rec(feature, 0)
+#     return rec(feature, 0)
 
 
 class Evolver:
@@ -88,6 +89,10 @@ class Evolver:
             "N": W[:, 1],
             "E": W[:, 2],
         }
+        for component, i in itertools.product("ZNE", range(1, 4)):
+            T = self.terminals[component]
+            s = T.shape[-1] // 3
+            self.terminals[component + str(i)] = T[:, (i - 1) * s : i * s]
 
     def simplify_feature_rec(self, feature):
         match feature:
@@ -110,27 +115,36 @@ class Evolver:
     def feature_rank(self, feature):
         return self.simplify_feature_rec(feature)[1] - 1
 
-    @lru_cache(maxsize=64)  # TODO: This is not the optimal caching strategy.
+    @lru_cache(maxsize=128)
+    def eval_feature_rec_cached(self, feature):
+        f, *x = feature
+        x_ = list(map(self.eval_feature_rec, x))
+        return np.nan_to_num(self.operators[f].apply(*x_))
+
     def eval_feature_rec(self, feature):
-        # print(f"eval_feature_rec({feature})")
+        # Assume feature is simplified!
         match feature:
             case (f, *x):
+                if f in {
+                    # "skew",
+                    # "kurtosis",
+                    "abs_fft",
+                    "envelope",
+                    "corr",
+                    "bp_1_3",
+                    "bp_3_10",
+                    "bp_10_20",
+                    "bp_20_45",
+                    "spectrogram",
+                }:
+                    return self.eval_feature_rec_cached(feature)
                 x_ = list(map(self.eval_feature_rec, x))
-                max_rank = max(len(x__.shape) for x__ in x_)
-                if max_rank == self.operators[f].cell_rank:
-                    # Would combine across traces - Not allowed.
-                    return x_[0]
-                if max_rank + self.operators[f].delta_rank < 1:
-                    # No-op.
-                    return x_[0]
                 return np.nan_to_num(self.operators[f].apply(*x_))
             case x:
                 return self.terminals[x]
 
-    def eval_feature(self, feature, simplify_first=True):
-        if simplify_first:
-            feature = self.simplify_feature(feature)
-        x = self.eval_feature_rec(feature)
+    def eval_feature(self, feature):
+        x = self.eval_feature_rec(self.simplify_feature(feature))
         while len(x.shape) > 1:  # TODO: stupid
             x = x[:, 0]
         return x
@@ -145,8 +159,24 @@ class Evolver:
 
     def score_features(self, features, should_contain=None):
         X = self.eval_features(features)
-        print("calculating mutual info...")
-        mi = mutual_info_classif(X, self.y, random_state=RANDOM_STATE)
+        # print("calculating mutual info...")
+        # mi = mutual_info_classif(X, self.y, random_state=RANDOM_STATE)
+        window_len = 1000
+        mi = [
+            np.mean(
+                np.abs(
+                    np.sum(
+                        np.lib.stride_tricks.sliding_window_view(
+                            self.y[np.argsort(X[:, i])], window_len
+                        ),
+                        axis=-1,
+                    )
+                    / window_len
+                    - 0.5
+                )
+            )
+            for i in range(len(features))
+        ]
         n_subtrees = np.array([count_subtrees(f) for f in features])
         ranks = np.array([self.feature_rank(f) for f in features])
         depth_penalty = 0.3 / (1 + np.exp(10 - 0.6 * n_subtrees))
@@ -165,23 +195,22 @@ class Evolver:
                 dtype=float,
             )
             scores -= contains_penalty
-        return np.clip(scores, 0, None)
+        return np.clip(scores, 0, None), X
 
-    def score_features_similarity(self, features, existing_features):
-        A = self.eval_features(features)
+    def score_features_similarity(self, A, existing_features):
         B = self.eval_features(existing_features)
         C = np.abs(np.nan_to_num(np.corrcoef(A, B, rowvar=False)))
         # Does max make sense?
-        return C[: len(features), -len(existing_features) :].max(axis=-1)
+        return C[: A.shape[-1], -len(existing_features) :].max(axis=-1)
 
     def score_features_with_existing(
         self, features, existing_features, should_contain=None
     ):
-        score = self.score_features(features, should_contain)  # mutual importance
+        score, X = self.score_features(features, should_contain)  # mutual importance
         if len(existing_features) == 0:
             return score
         simil = self.score_features_similarity(
-            features, existing_features
+            X, existing_features
         )  # absolute correlation [0,1]
         return np.clip(score - 0.3 * simil, 0, None)
 
@@ -210,9 +239,8 @@ class Evolver:
             ],
         )
 
-    def subtree_mutate_feature(self, feature, terminal_proba):
+    def subtree_mutate_feature(self, feature, max_depth, terminal_proba):
         i = random.randrange(count_subtrees(feature))
-        max_depth = feature_max_depth(self.get_subtree(feature, i))
         random_subtree = self.random_feature(max_depth, terminal_proba)
         return self.swap_subtree(feature, i, random_subtree)
 
@@ -306,22 +334,29 @@ class Evolver:
             for i in reversed(np.argsort(fitnesses)[-parameters.n_keep_best :]):
                 new_population.append(population[i])
             while len(new_population) < parameters.pop_size:
-                if random.random() < parameters.crossover_rate:
+                r = random.random()
+                if r < parameters.crossover_rate:
                     new_population.extend(
                         self.crossover(
                             *random.choices(population, weights=fitnesses, k=2)
                         )
                     )
-                elif random.random() < parameters.mutation_rate:
+                elif r < parameters.crossover_rate + parameters.mutation_rate:
                     new_population.append(
                         self.point_mutate_feature(
                             random.choices(population, weights=fitnesses, k=1)[0]
                         )
                     )
-                elif random.random() < parameters.subtree_mutation_rate:
+                elif (
+                    r
+                    < parameters.crossover_rate
+                    + parameters.mutation_rate
+                    + parameters.subtree_mutation_rate
+                ):
                     new_population.append(
                         self.subtree_mutate_feature(
                             random.choices(population, weights=fitnesses, k=1)[0],
+                            parameters.max_depth,
                             parameters.terminal_proba,
                         )
                     )
@@ -380,8 +415,11 @@ def score_model(
 @cache
 def load_evolver(split):
     dataset = seisbench.data.WaveformDataset(f"./pnw_splits/{split}")
+    W = dataset.get_waveforms(mask=np.ones(len(dataset), dtype=bool))
+    y = (dataset.metadata.source_type == "surface event").to_numpy(dtype=int)
+    ii = np.random.permutation(np.arange(y.shape[0]))
     return Evolver(
-        W=dataset.get_waveforms(mask=np.ones(len(dataset), dtype=bool)),
-        y=(dataset.metadata.source_type == "surface event").to_numpy(dtype=int),
+        W=W[ii, :],
+        y=y[ii],
         operators=all_operators,
     )
