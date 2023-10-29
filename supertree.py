@@ -44,8 +44,14 @@ def gini_scorer(E):
             ii = np.argsort(X[:, i])
             y = E.y[ii]
             scores[i] = 0.5 - best_split(y)[0]
-        # TODO: Add other penalties.
-        return scores
+        # TODO: Add depth penalty?
+        ranks = np.array([E.feature_rank(f) for f in features])
+        rank_penalty = 0.5 * (ranks != 0)
+        repeated_bandpass_penalty = 0.5 * np.array(
+            [evolve.feature_repeated_bandpass(E.simplify_feature(f)) for f in features],
+            dtype=float,
+        )
+        return np.clip(scores - rank_penalty - repeated_bandpass_penalty, 0, None)
 
     return scorer
 
@@ -59,21 +65,17 @@ def new_evolver(W, y):
     )
 
 
-params = evolve.EvolutionParameters(
-    pop_size=20,
-    n_keep_best=5,
-    crossover_rate=0.4,
-    mutation_rate=0.2,
-    subtree_mutation_rate=0.4,
-    max_depth=5,
-    n_generations=10,
-    terminal_proba=0.2,
-    should_contain=None,
-)
+class ClassifierMixin:
+    def predict(self, W):
+        return np.argmax(self.predict_proba(W), axis=-1)
+
+    def score(self, W, y):
+        pred_y = self.predict(W)
+        return np.sum(pred_y == y) / len(y)
 
 
 @dataclass
-class DecisionTree:
+class DecisionTree(ClassifierMixin):
     feature: tuple
     threshold: float
     gini: float
@@ -95,26 +97,22 @@ class DecisionTree:
         G.edges(((i, self.left.plot_rec(G)), (i, self.right.plot_rec(G))))
         return i
 
-    def predict(self, W):
+    def predict_proba(self, W):
         # W : n_traces,n_components,n_samples
         # Don't use new_evolver() here as it permutes the samples!
         E = evolve.Evolver(W=W, y=None, operators=all_operators)
         X = E.eval_feature(self.feature)
         left = X < self.threshold
         right = ~left
-        preds = np.full(W.shape[0], np.nan)
-        preds[left] = self.left.predict(W[left, :, :])
-        preds[right] = self.right.predict(W[right, :, :])
-        return preds
-
-    def score(self, W, y):
-        pred_y = self.predict(W)
-        return np.sum(pred_y == y) / len(y)
+        probs = np.full((W.shape[0], 2), np.nan)
+        probs[left] = self.left.predict_proba(W[left, :, :])
+        probs[right] = self.right.predict_proba(W[right, :, :])
+        return probs
 
 
 @dataclass
-class TerminalNode:
-    pred_class: int
+class TerminalNode(ClassifierMixin):
+    n_ones: int
     samples: int
     gini: float
 
@@ -122,26 +120,47 @@ class TerminalNode:
         i = str(id(self))
         G.node(
             i,
-            label=f"class={self.pred_class}, gini={self.gini}, samples={self.samples}",
+            label=f"p1={self.n_ones/self.samples}, gini={self.gini}, samples={self.samples}",
         )
         return i
 
-    def predict(self, W):
+    def predict_proba(self, W):
+        p_one = self.n_ones / self.samples
+        return np.column_stack(
+            (
+                np.full(W.shape[0], 1 - p_one),  # prob 0
+                np.full(W.shape[0], p_one),  # prob 1
+            )
+        )
         return np.full(W.shape[0], self.pred_class)
 
 
 # E10 = new_evolver(train.W[0:10], train.y[0:10])
 
+params = evolve.EvolutionParameters(
+    pop_size=20,
+    n_keep_best=5,
+    crossover_rate=0.4,
+    mutation_rate=0.2,
+    subtree_mutation_rate=0.4,
+    max_depth=5,
+    n_generations=10,
+    terminal_proba=0.2,
+    should_contain=None,
+)
 
-def build_decision_tree(E, max_depth, min_gini=0):
+
+def build_decision_tree(
+    E, evolution_params: evolve.EvolutionParameters, max_depth, min_gini=0
+):
     if len(E.y) == 0:
         return None
     whole_gini = gini_impurity(E.y)
     if max_depth == 0 or whole_gini <= min_gini:
-        pred_class = 1 if len(E.y[E.y == 1]) > len(E.y) / 2 else 0
-        return TerminalNode(pred_class=pred_class, samples=len(E.y), gini=whole_gini)
+        n_ones = len(E.y[E.y == 1])
+        return TerminalNode(samples=len(E.y), gini=whole_gini, n_ones=n_ones)
     best_feature = E.simplify_feature(
-        E.evolve_features(params, fitness_f=gini_scorer(E))[0]
+        E.evolve_features(evolution_params, fitness_f=gini_scorer(E))[0]
     )
     print(f"{best_feature=}")
     X = E.eval_feature(best_feature)
@@ -156,9 +175,15 @@ def build_decision_tree(E, max_depth, min_gini=0):
         gini=gini,
         samples=samples,
         left=build_decision_tree(
-            new_evolver(E.W[ii][:split_i], E.y[ii][:split_i]), max_depth - 1
+            new_evolver(E.W[ii][:split_i], E.y[ii][:split_i]),
+            evolution_params,
+            max_depth - 1,
+            min_gini=min_gini,
         ),
         right=build_decision_tree(
-            new_evolver(E.W[ii][split_i:], E.y[ii][split_i:]), max_depth - 1
+            new_evolver(E.W[ii][split_i:], E.y[ii][split_i:]),
+            evolution_params,
+            max_depth - 1,
+            min_gini=min_gini,
         ),
     )
