@@ -15,6 +15,6 @@ dependencies:
  - pytest=7.3.1
  # Dev stuff
  - python-lsp-server
- - ipython=8.14
+ - ipython=8.16
  - pyflakes=3.0.1
  - black=23.9.1
