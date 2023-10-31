@@ -44,14 +44,17 @@ def gini_scorer(E):
             ii = np.argsort(X[:, i])
             y = E.y[ii]
             scores[i] = 0.5 - best_split(y)[0]
-        # TODO: Add depth penalty?
         ranks = np.array([E.feature_rank(f) for f in features])
         rank_penalty = 0.5 * (ranks != 0)
         repeated_bandpass_penalty = 0.5 * np.array(
             [evolve.feature_repeated_bandpass(E.simplify_feature(f)) for f in features],
             dtype=float,
         )
-        return np.clip(scores - rank_penalty - repeated_bandpass_penalty, 0, None)
+        n_subtrees = np.array([evolve.count_subtrees(f) for f in features])
+        depth_penalty = 0.5 / (1 + np.exp(10 - 0.6 * n_subtrees))
+        return np.clip(
+            scores - rank_penalty - repeated_bandpass_penalty - depth_penalty, 0, None
+        )
 
     return scorer
 
