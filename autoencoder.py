@@ -56,12 +56,32 @@ class Autoencoder(nn.Module):
             nn.Conv2d(1, 4, kernel_size=3, padding="same"),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2),
+            # (batch_size, 4, 13, 64)
+            nn.Conv2d(4, 2, kernel_size=3, padding="same"),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=(1, 2)),
+            # (batch_size, 2, 13, 32)
+            nn.Conv2d(2, 1, kernel_size=3, padding="same"),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+            # (batch_size, 1, 6, 16)
         )
         self.up = nn.Sequential(
-            nn.Conv2d(4, 4, kernel_size=3, padding="same"),
+            # (batch_size, 1, 6, 16)
+            nn.Conv2d(1, 1, kernel_size=3, padding="same"),
+            nn.ReLU(),
+            nn.Upsample((13, 32)),
+            # (batch_size, 1, 13, 32)
+            nn.Conv2d(1, 2, kernel_size=3, padding="same"),
+            nn.ReLU(),
+            nn.Upsample((13, 64)),
+            # (batch_size, 2, 13, 64)
+            nn.Conv2d(2, 4, kernel_size=3, padding="same"),
             nn.ReLU(),
             nn.Upsample((26, 128)),
+            # (batch_size, 4, 26, 128)
             nn.Conv2d(4, 1, kernel_size=3, padding="same"),
+            # (batch_size, 1, 26, 128)
         )
 
     def forward(self, x):
@@ -97,6 +117,7 @@ def test(dataloader, model, loss_fn):
 
 def compare(ae):
     chunk = next(iter(valid_loader))
+    ae.eval()
     chunk_pred = ae(chunk)
     chunk = chunk.detach().numpy()
     chunk_pred = chunk_pred.detach().numpy()
@@ -108,15 +129,32 @@ def compare(ae):
     plt.show()
 
 
-def go():
+def go(path, epochs=100):
     ae = Autoencoder()
     loss_fn = nn.MSELoss()
     optimizer = torch.optim.Adam(ae.parameters(), lr=0.001)
     try:
-        for epoch in range(100):
+        for epoch in range(epochs):
             print(f"{epoch=}")
             train(train_loader, ae, loss_fn, optimizer)
             test(valid_loader, ae, loss_fn)
     except KeyboardInterrupt:
-        return ae
-    return ae
+        pass
+    torch.save(ae, path)
+    compare(ae)
+
+
+def compute_features(ae, dataset):
+    L = len(dataset)
+    features = np.zeros((L, 96))
+    ae.eval()
+    for i in range(L):
+        X = ae.down(dataset[i]).flatten().detach().numpy()
+        features[i] = X
+    return features
+
+
+def save_features(ae):
+    for split in ["train", "valid", "test"]:
+        features = compute_features(ae, SpectrogramDataset(split))
+        np.save(f"{split}_features", features)
