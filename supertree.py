@@ -161,7 +161,9 @@ def build_decision_tree(
     whole_gini = gini_impurity(E.y)
     if max_depth == 0 or whole_gini <= min_gini:
         n_ones = len(E.y[E.y == 1])
-        return TerminalNode(samples=len(E.y), gini=whole_gini, n_ones=n_ones)
+        node = TerminalNode(samples=len(E.y), gini=whole_gini, n_ones=n_ones)
+        print(f"{node=}, {max_depth=}")
+        return node
     best_feature = E.simplify_feature(
         E.evolve_features(evolution_params, fitness_f=gini_scorer(E))[0]
     )

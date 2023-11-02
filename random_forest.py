@@ -17,11 +17,12 @@ class RandomForest(ClassifierMixin):
     min_gini: float
     trees: list[DecisionTree] = field(default_factory=list)
 
-    def fit(self, W, y):
-        E = new_evolver(W, y)
+    def fit(self, W, y, p=1):
         assert len(self.trees) == 0
         for i in range(self.n_trees):
-            print(f"fitting tree {i}")
+            ii = np.random.permutation(W.shape[0])[: int(W.shape[0] * p)]
+            E = new_evolver(W[ii], y[ii])
+            print(f"fitting tree {i} w/ {len(ii)} samples")
             self.trees.append(
                 build_decision_tree(
                     E, self.evolution_params, self.max_depth, self.min_gini
