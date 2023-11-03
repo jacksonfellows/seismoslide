@@ -67,20 +67,25 @@ class Autoencoder(nn.Module):
             # (batch_size, 1, 6, 16)
         )
         self.up = nn.Sequential(
-            # (batch_size, 1, 6, 16)
-            nn.Conv2d(1, 1, kernel_size=3, padding="same"),
+            nn.ConvTranspose2d(
+                1, 2, kernel_size=3, stride=2, padding=(0, 1), output_padding=(0, 1)
+            ),
             nn.ReLU(),
-            nn.Upsample((13, 32)),
-            # (batch_size, 1, 13, 32)
-            nn.Conv2d(1, 2, kernel_size=3, padding="same"),
+            # (batch_size, 2, 13, 32)
+            nn.ConvTranspose2d(
+                2,
+                4,
+                kernel_size=3,
+                stride=(1, 2),
+                padding=(1, 1),
+                output_padding=(0, 1),
+            ),
             nn.ReLU(),
-            nn.Upsample((13, 64)),
-            # (batch_size, 2, 13, 64)
-            nn.Conv2d(2, 4, kernel_size=3, padding="same"),
+            # (batch_size, 4, 13, 64)
+            nn.ConvTranspose2d(
+                4, 1, kernel_size=3, stride=2, padding=(1, 1), output_padding=(1, 1)
+            ),
             nn.ReLU(),
-            nn.Upsample((26, 128)),
-            # (batch_size, 4, 26, 128)
-            nn.Conv2d(4, 1, kernel_size=3, padding="same"),
             # (batch_size, 1, 26, 128)
         )
 
