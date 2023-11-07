@@ -51,42 +51,27 @@ valid_loader = DataLoader(SpectrogramDataset("valid"), batch_size=64, shuffle=Tr
 class Autoencoder(nn.Module):
     def __init__(self):
         super().__init__()
+        # TODO: Use strides instead of max-pooling while down-sampling?
         self.down = nn.Sequential(
-            # (batch_size, 1, 26, 128)
-            nn.Conv2d(1, 4, kernel_size=3, padding="same"),
+            nn.Conv2d(1, 4, kernel_size=3, stride=2),
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2),
-            # (batch_size, 4, 13, 64)
-            nn.Conv2d(4, 2, kernel_size=3, padding="same"),
+            nn.Conv2d(4, 2, kernel_size=3, stride=(1, 2)),
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=(1, 2)),
-            # (batch_size, 2, 13, 32)
-            nn.Conv2d(2, 1, kernel_size=3, padding="same"),
+            nn.Conv2d(2, 1, kernel_size=3, stride=2),
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2),
-            # (batch_size, 1, 6, 16)
         )
         self.up = nn.Sequential(
-            nn.ConvTranspose2d(
-                1, 2, kernel_size=3, stride=2, padding=(0, 1), output_padding=(0, 1)
-            ),
+            nn.ConvTranspose2d(1, 2, kernel_size=3, stride=2, output_padding=(1, 0)),
             nn.ReLU(),
-            # (batch_size, 2, 13, 32)
             nn.ConvTranspose2d(
                 2,
                 4,
                 kernel_size=3,
                 stride=(1, 2),
-                padding=(1, 1),
-                output_padding=(0, 1),
             ),
             nn.ReLU(),
-            # (batch_size, 4, 13, 64)
-            nn.ConvTranspose2d(
-                4, 1, kernel_size=3, stride=2, padding=(1, 1), output_padding=(1, 1)
-            ),
+            nn.ConvTranspose2d(4, 1, kernel_size=3, stride=2, output_padding=(1, 1)),
             nn.ReLU(),
-            # (batch_size, 1, 26, 128)
         )
 
     def forward(self, x):
@@ -129,8 +114,10 @@ def compare(ae):
     N = 10
     fig, axs = plt.subplots(N, 2, sharex=True, sharey=True, layout="tight")
     for i in range(N):
-        axs[i, 0].imshow(chunk[i, 0], origin="lower")
-        axs[i, 1].imshow(chunk_pred[i, 0], origin="lower")
+        vmin, vmax = chunk[i, 0].min(), chunk[i, 0].max()
+        print(f"{vmin=}, {vmax=}")
+        axs[i, 0].imshow(chunk[i, 0], vmin=vmin, vmax=vmax, origin="lower")
+        axs[i, 1].imshow(chunk_pred[i, 0], vmin=vmin, vmax=vmax, origin="lower")
     plt.show()
 
 
@@ -151,7 +138,7 @@ def go(path, epochs=100):
 
 def compute_features(ae, dataset):
     L = len(dataset)
-    features = np.zeros((L, 96))
+    features = np.zeros((L, 60))
     ae.eval()
     for i in range(L):
         X = ae.down(dataset[i]).flatten().detach().numpy()
