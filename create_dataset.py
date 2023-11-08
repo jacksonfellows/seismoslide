@@ -60,6 +60,9 @@ def save_event(waveform, metadata, writer, sampling_rate):
         waveform, trace_P_arrival_sample, sampling_rate=sampling_rate
     )
     normalized = normalize(shifted)
+    if normalized.shape != (3, 6000):
+        print(f"skipping event - malformed shape {normalized.shape}")
+        return
     trace_start_time = (
         UTCDateTime(metadata.trace_start_time) + shift_samples / sampling_rate
     )
