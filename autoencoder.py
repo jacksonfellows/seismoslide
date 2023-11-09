@@ -56,6 +56,30 @@ class SpectrogramDataset:
         return len(self.metadata)
 
 
+class EnvelopeDataset:
+    def __init__(self, split):
+        self.envelope_dir = Path(f"./pnw_splits_Z_envelopes/{split}")
+        # Reuse metadata.
+        self.metadata = pd.read_csv(f"./pnw_splits/{split}/metadata.csv")
+
+    def __getitem__(self, i):
+        x = torch.tensor(np.load(self.envelope_dir / f"{i}.npy"))
+        x = torch.unsqueeze(x, 0)  # (1, 6000)
+        x /= x.max() + 1e-8  # Normalize to [0,1].
+        return x
+
+    def __len__(self):
+        return len(self.metadata)
+
+
+envelope_train_loader = DataLoader(
+    EnvelopeDataset("train"), batch_size=64, shuffle=True
+)
+envelope_valid_loader = DataLoader(
+    EnvelopeDataset("valid"), batch_size=64, shuffle=True
+)
+
+
 class WaveformDataset:
     def __init__(self, split):
         self.seisbench_dataset = seisbench.data.WaveformDataset(f"./pnw_splits/{split}")
