@@ -87,6 +87,10 @@ class WaveformDataset:
     def __getitem__(self, i):
         W = self.seisbench_dataset.get_waveforms(i)
         assert W.shape == (3, 6000)
+        W = W[0:1]
+        assert W.shape == (1, 6000)
+        W /= np.abs(W).max() + 1e-8  # Normalize to [-1,1].
+        # TODO: Test the effects of normalization.
         return torch.tensor(W, dtype=torch.float32)
 
     def __len__(self):
@@ -112,30 +116,37 @@ class WaveformAutoencoder(nn.Module):
     def __init__(self):
         super().__init__()
         self.down = nn.Sequential(
-            nn.Conv1d(3, 8, kernel_size=11, stride=2, padding=5),
+            nn.Conv1d(1, 16, kernel_size=11, stride=2, padding=5),
             nn.ReLU(),
-            nn.Conv1d(8, 4, kernel_size=9, stride=2, padding=4),
+            nn.Conv1d(16, 8, kernel_size=9, stride=2, padding=4),
             nn.ReLU(),
-            nn.Conv1d(4, 2, kernel_size=7, stride=2, padding=3),
+            nn.Conv1d(8, 4, kernel_size=7, stride=2, padding=3),
             nn.ReLU(),
-            nn.Conv1d(2, 1, kernel_size=5, stride=2, padding=2),
+            nn.Conv1d(4, 2, kernel_size=5, stride=2, padding=2),
             nn.ReLU(),
+            nn.Conv1d(2, 1, kernel_size=3, stride=2, padding=1),
+            nn.ReLU(),
+            # Down to 188.
         )
         self.up = nn.Sequential(
             nn.ConvTranspose1d(
-                1, 2, kernel_size=5, stride=2, padding=2, output_padding=1
+                1, 2, kernel_size=3, stride=2, padding=1, output_padding=0
             ),
             nn.ReLU(),
             nn.ConvTranspose1d(
-                2, 4, kernel_size=7, stride=2, padding=3, output_padding=1
+                2, 4, kernel_size=5, stride=2, padding=2, output_padding=1
             ),
             nn.ReLU(),
             nn.ConvTranspose1d(
-                4, 8, kernel_size=9, stride=2, padding=4, output_padding=1
+                4, 8, kernel_size=7, stride=2, padding=3, output_padding=1
             ),
             nn.ReLU(),
             nn.ConvTranspose1d(
-                8, 3, kernel_size=11, stride=2, padding=5, output_padding=1
+                8, 16, kernel_size=9, stride=2, padding=4, output_padding=1
+            ),
+            nn.ReLU(),
+            nn.ConvTranspose1d(
+                16, 1, kernel_size=11, stride=2, padding=5, output_padding=1
             ),
             # Is ReLU making it harder to generate symmetric/negative seismograms?
         )
@@ -218,29 +229,31 @@ def test(dataloader, model, loss_fn):
 
 
 def waveform_plotter(W, ax):
-    for i in range(3):
+    for i in range(W.shape[0]):
         ax.plot(W[i])
 
 
 def train_test_loop(ae, train_loader, valid_loader, plotter, path, epochs=100):
+    if os.path.exists(path):
+        raise ValueError(f"path {path} already exists!")
     loss_fn = nn.MSELoss()
     optimizer = torch.optim.Adam(ae.parameters(), lr=0.001)
+    chunk = next(iter(valid_loader))
+    chunk_det = chunk.detach().numpy()
     try:
         for epoch in range(epochs):
             print(f"{epoch=}")
             train(train_loader, ae, loss_fn, optimizer)
             test(valid_loader, ae, loss_fn)
             # Plot original vs. auto-encoded
-            chunk = next(iter(valid_loader))
             ae.eval()
             chunk_enc = ae(chunk).detach().numpy()
-            chunk = chunk.detach().numpy()
-            N = 4
+            N = 6
             fig, axs = plt.subplots(
                 N, 2, sharex=True, sharey=True, layout="tight", figsize=(8.5, 11)
             )
             for i in range(N):
-                plotter(chunk[i], axs[i, 0])
+                plotter(chunk_det[i], axs[i, 0])
                 plotter(chunk_enc[i], axs[i, 1])
             plt.savefig(f"training_output/{epoch:04d}.png")
             plt.close()
@@ -251,7 +264,7 @@ def train_test_loop(ae, train_loader, valid_loader, plotter, path, epochs=100):
 
 def compute_features(ae, dataset):
     L = len(dataset)
-    features = np.zeros((L, 60))
+    features = np.zeros((L, 188))
     ae.eval()
     for i in range(L):
         X = ae.down(dataset[i]).flatten().detach().numpy()
@@ -259,9 +272,9 @@ def compute_features(ae, dataset):
     return features
 
 
-def save_features(ae):
+def save_features(ae, dataset):
     for split in ["train", "valid", "test"]:
-        features = compute_features(ae, SpectrogramDataset(split))
+        features = compute_features(ae, dataset(split))
         np.save(f"{split}_features", features)
 
 
