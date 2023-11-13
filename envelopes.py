@@ -24,3 +24,7 @@ def write_envelopes(split):
 def write_all():
     for split in ["train", "valid", "test"]:
         write_envelopes(split)
+
+
+if __name__ == "__main__":
+    write_all()
