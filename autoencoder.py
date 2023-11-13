@@ -148,7 +148,6 @@ class WaveformAutoencoder(nn.Module):
             nn.ConvTranspose1d(
                 16, 1, kernel_size=11, stride=2, padding=5, output_padding=1
             ),
-            # Is ReLU making it harder to generate symmetric/negative seismograms?
         )
 
     def forward(self, x):
@@ -158,7 +157,6 @@ class WaveformAutoencoder(nn.Module):
 class SpectrogramAutoencoder(nn.Module):
     def __init__(self):
         super().__init__()
-        # TODO: Use strides instead of max-pooling while down-sampling?
         self.down = nn.Sequential(
             nn.Conv2d(1, 4, kernel_size=3, stride=2),
             nn.ReLU(),
@@ -170,12 +168,7 @@ class SpectrogramAutoencoder(nn.Module):
         self.up = nn.Sequential(
             nn.ConvTranspose2d(1, 2, kernel_size=3, stride=2, output_padding=(1, 0)),
             nn.ReLU(),
-            nn.ConvTranspose2d(
-                2,
-                4,
-                kernel_size=3,
-                stride=(1, 2),
-            ),
+            nn.ConvTranspose2d(2, 4, kernel_size=3, stride=(1, 2)),
             nn.ReLU(),
             nn.ConvTranspose2d(4, 1, kernel_size=3, stride=2, output_padding=(1, 1)),
             nn.ReLU(),
@@ -210,6 +203,7 @@ def test(dataloader, model, loss_fn):
             print(f"{i}/{n_chunks}")
     mean_loss = test_loss / n_chunks
     print(f"{mean_loss=:0.5f}")
+    return mean_loss
 
 
 # def compare(ae):
