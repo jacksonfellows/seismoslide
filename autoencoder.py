@@ -223,6 +223,7 @@ def test(dataloader, model, loss_fn):
 
 
 def waveform_plotter(W, ax):
+    ax.set_ylim(0, 1)
     for i in range(W.shape[0]):
         ax.plot(W[i])
 
@@ -238,7 +239,7 @@ def train_test_loop(ae, train_loader, valid_loader, plotter, path, epochs=100):
         for epoch in range(epochs):
             print(f"{epoch=}")
             train(train_loader, ae, loss_fn, optimizer)
-            test(valid_loader, ae, loss_fn)
+            mean_loss = test(valid_loader, ae, loss_fn)
             # Plot original vs. auto-encoded
             ae.eval()
             chunk_enc = ae(chunk).detach().numpy()
@@ -249,6 +250,7 @@ def train_test_loop(ae, train_loader, valid_loader, plotter, path, epochs=100):
             for i in range(N):
                 plotter(chunk_det[i], axs[i, 0])
                 plotter(chunk_enc[i], axs[i, 1])
+            fig.suptitle(f"epoch={epoch}, mean_loss={mean_loss:0.5f}")
             plt.savefig(f"training_output/{epoch:04d}.png")
             plt.close()
     except KeyboardInterrupt:
@@ -258,7 +260,8 @@ def train_test_loop(ae, train_loader, valid_loader, plotter, path, epochs=100):
 
 def compute_features(ae, dataset):
     L = len(dataset)
-    features = np.zeros((L, 188))
+    N = len(ae.down(dataset[0]).flatten())
+    features = np.zeros((L, N))
     ae.eval()
     for i in range(L):
         X = ae.down(dataset[i]).flatten().detach().numpy()
