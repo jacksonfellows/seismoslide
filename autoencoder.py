@@ -1,3 +1,4 @@
+import math
 import os
 from pathlib import Path
 
@@ -113,42 +114,47 @@ spectrogram_valid_loader = DataLoader(
 
 
 class WaveformAutoencoder(nn.Module):
-    def __init__(self):
+    def __init__(self, depth, kernel_size):
         super().__init__()
-        self.down = nn.Sequential(
-            nn.Conv1d(1, 16, kernel_size=11, stride=2, padding=5),
-            nn.ReLU(),
-            nn.Conv1d(16, 8, kernel_size=9, stride=2, padding=4),
-            nn.ReLU(),
-            nn.Conv1d(8, 4, kernel_size=7, stride=2, padding=3),
-            nn.ReLU(),
-            nn.Conv1d(4, 2, kernel_size=5, stride=2, padding=2),
-            nn.ReLU(),
-            nn.Conv1d(2, 1, kernel_size=3, stride=2, padding=1),
-            nn.ReLU(),
-            # Down to 188.
-        )
-        self.up = nn.Sequential(
-            nn.ConvTranspose1d(
-                1, 2, kernel_size=3, stride=2, padding=1, output_padding=0
-            ),
-            nn.ReLU(),
-            nn.ConvTranspose1d(
-                2, 4, kernel_size=5, stride=2, padding=2, output_padding=1
-            ),
-            nn.ReLU(),
-            nn.ConvTranspose1d(
-                4, 8, kernel_size=7, stride=2, padding=3, output_padding=1
-            ),
-            nn.ReLU(),
-            nn.ConvTranspose1d(
-                8, 16, kernel_size=9, stride=2, padding=4, output_padding=1
-            ),
-            nn.ReLU(),
-            nn.ConvTranspose1d(
-                16, 1, kernel_size=11, stride=2, padding=5, output_padding=1
-            ),
-        )
+        down_layers = []
+        up_layers = []
+        assert kernel_size % 2 == 1  # Padding only works out for odd-sized kernels.
+        length = 6000
+        num_channels = 1
+        for i in range(depth):
+            padding = kernel_size // 2
+            next_num_channels = (
+                2 ** (depth - 1)
+                if i == 0
+                else (num_channels // 2 if num_channels > 1 else num_channels)
+            )
+            down_layers.append(
+                nn.Conv1d(
+                    num_channels,
+                    next_num_channels,
+                    kernel_size=kernel_size,
+                    stride=2,
+                    padding=padding,
+                )
+            )
+            down_layers.append(nn.ReLU())
+            # up_layers will be reversed.
+            up_layers.append(
+                nn.ConvTranspose1d(
+                    next_num_channels,
+                    num_channels,
+                    kernel_size=kernel_size,
+                    stride=2,
+                    padding=padding,
+                    output_padding=1 if length % 2 == 0 else 0,
+                )
+            )
+            up_layers.append(nn.ReLU())
+            length = math.ceil(length / 2)
+            num_channels = next_num_channels
+        self.down = nn.Sequential(*down_layers)
+        # Drop activation after last layer.
+        self.up = nn.Sequential(*list(reversed(up_layers))[1:])
 
     def forward(self, x):
         return self.up(self.down(x))
