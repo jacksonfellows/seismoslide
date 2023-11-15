@@ -114,7 +114,7 @@ spectrogram_valid_loader = DataLoader(
 
 
 class WaveformAutoencoder(nn.Module):
-    def __init__(self, depth, kernel_size):
+    def __init__(self, depth, kernel_size, layer_num_channels):
         super().__init__()
         down_layers = []
         up_layers = []
@@ -123,11 +123,8 @@ class WaveformAutoencoder(nn.Module):
         num_channels = 1
         for i in range(depth):
             padding = kernel_size // 2
-            next_num_channels = (
-                2 ** (depth - 1)
-                if i == 0
-                else (num_channels // 2 if num_channels > 1 else num_channels)
-            )
+            num_channels = layer_num_channels[i]
+            next_num_channels = layer_num_channels[i + 1]
             down_layers.append(
                 nn.Conv1d(
                     num_channels,
