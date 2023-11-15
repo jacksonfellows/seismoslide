@@ -61,3 +61,52 @@ def svc_hyper_opt():
     gs = GridSearchCV(SVC(), svc_param_grid, n_jobs=-1, cv=4)
     gs.fit(train_X, train_y)
     return gs
+
+
+def plot_embedded_features():
+    fig, axs = plt.subplots(ncols=2)
+    axs[0].set_title("earthquake")
+    axs[1].set_title("surface event")
+    axs[0].imshow(valid_X[valid_y == 0][:800])
+    axs[1].imshow(valid_X[valid_y == 1][:800])
+    plt.show()
+
+
+# Copied from autoencoder.py.
+def plot_t_sne(X, y):
+    X_emb = TSNE().fit_transform(X)
+    plt.scatter(X_emb[:, 0][y == 0], X_emb[:, 1][y == 0], alpha=0.3, label="earthquake")
+    plt.scatter(
+        X_emb[:, 0][y == 1], X_emb[:, 1][y == 1], alpha=0.3, label="surface event"
+    )
+    plt.legend()
+    plt.show()
+
+
+def plot_kmeans(X, y, n_clusters):
+    kmeans = KMeans(n_clusters=n_clusters)
+    y_pred = kmeans.fit_predict(X)
+    for i in range(n_clusters):
+        y_in_cluster = y[y_pred == i]
+        ys = np.sum(y_in_cluster)
+        print(f"{len(y_in_cluster) - ys} earthquakes, {ys} surface events")
+    # Use t-sne to scatter.
+    X_emb = TSNE().fit_transform(X)
+    plt.scatter(
+        X_emb[:, 0][y == 0],
+        X_emb[:, 1][y == 0],
+        alpha=0.3,
+        c=y_pred[y == 0],
+        marker="s",
+        label="earthquake",
+    )
+    plt.scatter(
+        X_emb[:, 0][y == 1],
+        X_emb[:, 1][y == 1],
+        alpha=0.3,
+        c=y_pred[y == 1],
+        marker="o",
+        label="surface event",
+    )
+    plt.legend()
+    plt.show()
