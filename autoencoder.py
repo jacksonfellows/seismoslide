@@ -74,10 +74,10 @@ class EnvelopeDataset:
 
 
 envelope_train_loader = DataLoader(
-    EnvelopeDataset("train"), batch_size=64, shuffle=True
+    EnvelopeDataset("train"), batch_size=128, shuffle=True
 )
 envelope_valid_loader = DataLoader(
-    EnvelopeDataset("valid"), batch_size=64, shuffle=True
+    EnvelopeDataset("valid"), batch_size=128, shuffle=True
 )
 
 
@@ -98,19 +98,19 @@ class WaveformDataset:
         return len(self.seisbench_dataset)
 
 
-waveform_train_loader = DataLoader(
-    WaveformDataset("train"), batch_size=64, shuffle=True
-)
-waveform_valid_loader = DataLoader(
-    WaveformDataset("valid"), batch_size=64, shuffle=True
-)
+# waveform_train_loader = DataLoader(
+#     WaveformDataset("train"), batch_size=128, shuffle=True
+# )
+# waveform_valid_loader = DataLoader(
+#     WaveformDataset("valid"), batch_size=128, shuffle=True
+# )
 
-spectrogram_train_loader = DataLoader(
-    SpectrogramDataset("train"), batch_size=64, shuffle=True
-)
-spectrogram_valid_loader = DataLoader(
-    SpectrogramDataset("valid"), batch_size=64, shuffle=True
-)
+# spectrogram_train_loader = DataLoader(
+#     SpectrogramDataset("train"), batch_size=128, shuffle=True
+# )
+# spectrogram_valid_loader = DataLoader(
+#     SpectrogramDataset("valid"), batch_size=128, shuffle=True
+# )
 
 
 class WaveformAutoencoder(nn.Module):
@@ -181,12 +181,11 @@ class SpectrogramAutoencoder(nn.Module):
         return self.up(self.down(x))
 
 
-def train(dataloader, model, loss_fn, optimizer):
+def train(dataloader, model, loss_fn, optimizer, epoch):
     model.train()
     n_chunks = len(dataloader)
     for i, X in enumerate(dataloader):
-        X_ = model(X)
-        loss = loss_fn(X, X_)
+        loss = loss_fn(model, X, epoch)
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
@@ -194,13 +193,12 @@ def train(dataloader, model, loss_fn, optimizer):
             print(f"{i}/{n_chunks}")
 
 
-def test(dataloader, model, loss_fn):
+def test(dataloader, model, loss_fn, epoch):
     model.eval()
     test_loss = 0
     n_chunks = len(dataloader)
     for i, X in enumerate(dataloader):
-        X_ = model(X)
-        loss = loss_fn(X, X_)
+        loss = loss_fn(model, X, epoch)
         test_loss += loss
         if i % 10 == 0:
             print(f"{i}/{n_chunks}")
@@ -231,18 +229,22 @@ def waveform_plotter(W, ax):
         ax.plot(W[i])
 
 
-def train_test_loop(ae, train_loader, valid_loader, plotter, path, epochs=100):
+def train_test_loop(
+    ae, train_loader, valid_loader, plotter, path, epochs=100, loss_fn=None
+):
     if os.path.exists(path):
         raise ValueError(f"path {path} already exists!")
-    loss_fn = nn.MSELoss()
+    if loss_fn is None:
+        mse = nn.MSELoss()
+        loss_fn = lambda model, X, epoch: mse(X, model.forward(X))
     optimizer = torch.optim.Adam(ae.parameters(), lr=0.001)
     chunk = next(iter(valid_loader))
     chunk_det = chunk.detach().numpy()
     try:
         for epoch in range(epochs):
             print(f"{epoch=}")
-            train(train_loader, ae, loss_fn, optimizer)
-            mean_loss = test(valid_loader, ae, loss_fn)
+            train(train_loader, ae, loss_fn, optimizer, epoch)
+            mean_loss = test(valid_loader, ae, loss_fn, epoch)
             # Plot original vs. auto-encoded
             ae.eval()
             chunk_enc = ae(chunk).detach().numpy()
