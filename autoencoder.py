@@ -272,10 +272,10 @@ def compute_features(ae, dataset):
     return features
 
 
-def save_features(ae, dataset):
+def save_features(ae, dataset, suffix=""):
     for split in ["train", "valid", "test"]:
         features = compute_features(ae, dataset(split))
-        np.save(f"{split}_features", features)
+        np.save(f"{split}_features{suffix}", features)
 
 
 def plot_t_sne(X, y):
