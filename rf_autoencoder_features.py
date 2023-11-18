@@ -110,3 +110,9 @@ def plot_kmeans(X, y, n_clusters):
     )
     plt.legend()
     plt.show()
+
+
+def plot_feature_correlations(X):
+    C = np.corrcoef(X, rowvar=False)
+    plt.imshow(C, vmin=-1, vmax=1)
+    plt.show()
