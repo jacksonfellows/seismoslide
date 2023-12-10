@@ -42,21 +42,21 @@ class Autoencoder(nn.Module):
     def __init__(self):
         super().__init__()
         self.down = nn.Sequential(
-            nn.Conv1d(1, 4, kernel_size=3, stride=2, padding=1),
+            nn.Conv1d(1, 16, kernel_size=3, stride=2, padding=1),
             nn.ReLU(),
-            nn.Conv1d(4, 8, kernel_size=3, stride=2, padding=1),
-            nn.ReLU(),
-            nn.Conv1d(8, 8, kernel_size=3, stride=2, padding=1),
-            nn.ReLU(),
-            nn.Conv1d(8, 8, kernel_size=3, stride=2, padding=1),
+            nn.Conv1d(16, 8, kernel_size=3, stride=2, padding=1),
             nn.ReLU(),
             nn.Conv1d(8, 4, kernel_size=3, stride=2, padding=1),
+            nn.ReLU(),
+            nn.Conv1d(4, 2, kernel_size=3, stride=2, padding=1),
+            nn.ReLU(),
+            nn.Conv1d(2, 1, kernel_size=3, stride=2, padding=1),
             nn.ReLU(),
         )
         self.up = nn.Sequential(
             nn.ConvTranspose1d(
-                4,
-                8,
+                1,
+                2,
                 kernel_size=3,
                 stride=2,
                 padding=1,
@@ -64,23 +64,23 @@ class Autoencoder(nn.Module):
             ),
             nn.ReLU(),
             nn.ConvTranspose1d(
-                8, 8, kernel_size=3, stride=2, padding=1, output_padding=1
+                2, 4, kernel_size=3, stride=2, padding=1, output_padding=1
             ),
             nn.ReLU(),
             nn.ConvTranspose1d(
-                8, 8, kernel_size=3, stride=2, padding=1, output_padding=1
+                4, 8, kernel_size=3, stride=2, padding=1, output_padding=1
             ),
             nn.ReLU(),
             nn.ConvTranspose1d(
-                8, 4, kernel_size=3, stride=2, padding=1, output_padding=1
+                8, 16, kernel_size=3, stride=2, padding=1, output_padding=1
             ),
             nn.ReLU(),
             nn.ConvTranspose1d(
-                4, 1, kernel_size=3, stride=2, padding=1, output_padding=1
+                16, 1, kernel_size=3, stride=2, padding=1, output_padding=1
             ),
         )
         self.fc = nn.Sequential(
-            nn.Linear(4 * 188, 64),
+            nn.Linear(1 * 188, 64),
             nn.ReLU(),
             nn.Linear(64, 2),
             nn.Softmax(),
@@ -127,7 +127,7 @@ def train_test_loop(ae, train_loader, valid_loader, plotter, path, epochs=100):
         raise ValueError(f"path {path} already exists!")
     autoencoder_loss_fn = nn.MSELoss()
     prediction_loss_fn = nn.CrossEntropyLoss()
-    lambda_ = 0.1
+    lambda_ = 0
     loss_fn = lambda model, X, y: (1 - lambda_) * autoencoder_loss_fn(
         model.forward(X), X
     ) + (lambda_ * prediction_loss_fn(model.predict(X), y) if lambda_ != 0 else 0)
@@ -138,7 +138,7 @@ def train_test_loop(ae, train_loader, valid_loader, plotter, path, epochs=100):
     try:
         for epoch in range(epochs):
             if epoch == 10:
-                lambda_ = 0.5
+                lambda_ = 0.1
             if epoch == 20:
                 print("Changing to prediction mode!")
                 for p in ae.down.parameters():

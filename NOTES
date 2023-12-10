@@ -11,3 +11,17 @@ fitting random forest (n_trees=1000)...
 scoring random forest...
 score=0.9217
 took 10912.783004045486 s
+
+
+pickled_autoencoders/envelope_01.pickle - score of 0.9497364457831325
+
+pickled_autoencoders/envelope_02.pickle
+trained 01 a bit more.
+I think this may be the best one so far.
+SVC: 0.9608433734939759
+
+pickled_autoencoders/envelope_09.pickle
+SVC: 0.958019578313253
+
+pickled_autoencoders/new_ae_07.pickle
+SVC: 0.9542545180722891

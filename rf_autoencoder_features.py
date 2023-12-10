@@ -1,10 +1,13 @@
 import numpy as np
 import pandas as pd
+from matplotlib import pyplot as plt
+from sklearn.cluster import KMeans
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.manifold import TSNE
 from sklearn.model_selection import GridSearchCV
 from sklearn.naive_bayes import GaussianNB
 from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
 from sklearn.svm import SVC
 
 train_X = np.load("train_features.npy")
@@ -48,17 +51,21 @@ def hyper_parameter_opt():
 
 # clf2 = GaussianNB() # Doesn't seem to work very well.
 
-# TODO: scale data?
-clf2 = SVC(C=10, gamma=0.001)
+# TODD: scale data?
+# clf2 = make_pipeline(StandardScaler(), SVC(C=10, gamma=0.001))
+# clf2 = make_pipeline(StandardScaler(), SVC(C=1000, gamma=0.0001))
+# clf2 = SVC(C=10, gamma=0.001)
+# clf2 = SVC(C=50, gamma=0.0005)
+# clf2 = make_pipeline(StandardScaler(), SVC(C=50, gamma=0.0005))
 
 svc_param_grid = {
-    "gamma": [10**n for n in range(-3, 4)],
-    "C": [10**n for n in range(-3, 4)],
+    "svc__gamma": [0.0001, 0.0005, 0.001, 0.005, 0.01],
+    "svc__C": [0.1, 0.5, 1, 5, 10, 50, 100],
 }
 
 
 def svc_hyper_opt():
-    gs = GridSearchCV(SVC(), svc_param_grid, n_jobs=-1, cv=4)
+    gs = GridSearchCV(make_pipeline(SVC()), svc_param_grid, n_jobs=-1, cv=4)
     gs.fit(train_X, train_y)
     return gs
 
@@ -67,8 +74,9 @@ def plot_embedded_features():
     fig, axs = plt.subplots(ncols=2)
     axs[0].set_title("earthquake")
     axs[1].set_title("surface event")
-    axs[0].imshow(valid_X[valid_y == 0][:800])
-    axs[1].imshow(valid_X[valid_y == 1][:800])
+    V = StandardScaler().fit_transform(valid_X)
+    axs[0].imshow(V[valid_y == 0][:800])
+    axs[1].imshow(V[valid_y == 1][:800])
     plt.show()
 
 
