@@ -1,20 +1,24 @@
 import itertools
 
 import numpy as np
+import scipy
 import seisbench.data
 from matplotlib import pyplot as plt
+from obspy.signal.filter import bandpass
 from obspy.signal.trigger import classic_sta_lta
 
 from create_dataset import normalize
-from envelopes import envelope
+
+# from envelopes import envelope
 
 rng = np.random.default_rng(123)
 
-# ds = seisbench.data.PNWExotic()
-ds = seisbench.data.PNW()
+ds = seisbench.data.PNWExotic()
+# ds = seisbench.data.PNW()
+ds_noise = seisbench.data.PNWNoise()
 ds_i = np.arange(len(ds))[:1000]
-# Take envelope?
-ds_normalized = [normalize(ds.get_waveforms(i)[0]) for i in ds_i]
+ds_waveforms = [normalize(ds.get_waveforms(i)[0]) for i in ds_i]
+ds_noise_waveforms = [normalize(ds_noise.get_waveforms(i)[0]) for i in ds_i]
 ds_p_arrival_sample = [ds.metadata.iloc[i]["trace_P_arrival_sample"] for i in ds_i]
 
 
@@ -26,13 +30,20 @@ def plot_waveform(x):
     plt.show()
 
 
-def sta_lta(x, s, l):
-    return classic_sta_lta(x, s, l)
-
-
-def pick(x, s, l, threshold):
-    y = sta_lta(x, s, l)
-    return y > threshold
+def pick(x, s, l, start, end):
+    y = classic_sta_lta(x, s, l)
+    # slow and dumb
+    out = np.empty_like(y, dtype="bool")
+    on = False
+    for i in range(len(y)):
+        if on:
+            if y[i] < end:
+                on = False
+        else:
+            if y[i] > start:
+                on = True
+        out[i] = on
+    return out
 
 
 def onsets(picks):
@@ -41,9 +52,9 @@ def onsets(picks):
     return np.arange(1, len(picks))[(w[:, 0] == 0) & (w[:, 1] == 1)]
 
 
-def score_picker(**kwargs):
+def score_picker(kwargs):
     score = 0
-    for x, p_arrival_sample in zip(ds_normalized, ds_p_arrival_sample):
+    for x, p_arrival_sample in zip(ds_waveforms, ds_p_arrival_sample):
         picked_samples = onsets(pick(x, **kwargs))
         if np.isnan(p_arrival_sample):
             continue
@@ -51,30 +62,49 @@ def score_picker(**kwargs):
             score += np.min(np.abs(picked_samples - p_arrival_sample))
         else:
             score += len(x) // 2
-        score += 10 * len(picked_samples)
-    return score / len(ds_normalized)
+    return score / len(ds_waveforms)
+
+
+def score_picker_noise(kwargs):
+    score = 0
+    for x in ds_noise_waveforms:
+        picked_samples = onsets(pick(x, **kwargs))
+        score += len(picked_samples)
+    return score / len(ds_waveforms)
 
 
 def lookat(picker_kwargs):
-    N = 5
-    fig, axs = plt.subplots(nrows=2, ncols=N, sharex=True)
-    for axi, i in enumerate(rng.integers(0, len(ds_normalized), size=N)):
-        x = ds_normalized[i]
+    N = 10
+    fig, axs = plt.subplots(nrows=2, ncols=N, sharex=True, sharey="row")
+    for i in range(N):
+        x = ds_waveforms[i]
         picks = pick(x, **picker_kwargs)
-        axs[0, axi].plot(x)
-        axs[1, axi].plot(picks)
+        axs[0, i].plot(x)
+        axs[1, i].plot(picks)
     plt.show()
 
 
-def grid_search():
+def lookat_noise(picker_kwargs):
+    N = 10
+    fig, axs = plt.subplots(nrows=2, ncols=N, sharex=True, sharey="row")
+    for i in range(N):
+        x = ds_noise_waveforms[i]
+        picks = pick(x, **picker_kwargs)
+        axs[0, i].plot(x)
+        axs[1, i].plot(picks)
+    plt.show()
+
+
+def grid_search(score_f):
     best_score = float("inf")
-    for s, l, threshold in itertools.product(
-        [5, 10, 25, 50, 75, 100],
-        [500, 750, 1000, 1250, 1500],
-        [1, 2.5, 5, 7.5, 10],
+    for s, l, start, end in itertools.product(
+        [100, 150, 200, 500, 1000],
+        [500, 1000, 2500, 5000, 7500],
+        [1, 2, 5, 10],
+        [0.5, 1, 2],
     ):
-        kwargs = dict(s=s, l=l, threshold=threshold)
-        score = score_picker(**kwargs)
+        kwargs = dict(s=s, l=l, start=start, end=end)
+        score = score_f(kwargs)
         if score < best_score:
             print(score, kwargs)
             best_score = score
