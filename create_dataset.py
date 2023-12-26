@@ -7,51 +7,22 @@ import seisbench.data
 from obspy import UTCDateTime
 from obspy.signal.filter import bandpass
 
+from mydataset import MyDatasetWriter
+
 
 def shift_P_arrival(
     waveform,
     trace_P_arrival_sample,
-    sampling_rate=100,
-    waveform_len_samples=6000,
-    pre_arrival_len_samples=1000,
+    sampling_rate,
+    waveform_len_samples,
+    pre_arrival_len_samples,
 ):
     """Shifts a waveform so that the P arrival is in a consistent
     place. Returns (shifted waveform, # of samples shifted)."""
     start_samples = int(trace_P_arrival_sample - pre_arrival_len_samples)
     return (
-        waveform[:, start_samples : (start_samples + waveform_len_samples)],
+        waveform[start_samples : (start_samples + waveform_len_samples)],
         start_samples,
-    )
-
-
-def taper(waveform, taper_len_s, freq):
-    taper_len = taper_len_s * freq
-    hann = scipy.signal.windows.hann(2 * taper_len)
-    taper = np.ones(waveform.shape[-1])
-    taper[0:taper_len] = hann[0:taper_len]
-    taper[-taper_len:] = hann[-taper_len:]
-    return taper * waveform
-
-
-def normalize(waveform):
-    """Normalize a waveform for testing/prediction."""
-    normalized = scipy.signal.detrend(waveform)  # Should I also remove mean?
-    normalized /= np.std(normalized)  # std vs max?
-    normalized = taper(normalized, 1, 100)  # 1s taper
-    # Same frequency range as EQTransformer.
-    normalized = bandpass(
-        normalized, freqmin=1, freqmax=45, df=100, corners=2, zerophase=True
-    )
-    return normalized
-
-
-def qualified_station_name(metadata):
-    return (
-        metadata.station_network_code
-        + "."
-        + metadata.station_code
-        + "."
-        + metadata.station_location_code
     )
 
 
@@ -63,47 +34,54 @@ np_gen = np.random.default_rng(123)
 
 
 def save_event(waveform, metadata, writer, sampling_rate):
+    WAVEFORM_LEN = 9000
+    waveform = waveform[0]  # Z component.
     if metadata.source_type != "noise":
         trace_P_arrival_sample = metadata.trace_P_arrival_sample
         if np.isnan(trace_P_arrival_sample):
             print("skipping event - no trace_P_arrival_sample")
             return
         shifted, shift_samples = shift_P_arrival(
-            waveform, trace_P_arrival_sample, sampling_rate=sampling_rate
+            waveform,
+            trace_P_arrival_sample,
+            sampling_rate=sampling_rate,
+            waveform_len_samples=WAVEFORM_LEN,
+            pre_arrival_len_samples=3000,
         )
-        normalized = normalize(shifted)
         trace_start_time = (
             UTCDateTime(metadata.trace_start_time) + shift_samples / sampling_rate
         )
     else:
-        normalized = normalize(waveform[:, :6000])
+        shifted = waveform[:WAVEFORM_LEN]
         trace_start_time = UTCDateTime(metadata.trace_start_time)
-    if normalized.shape != (3, 6000):
-        print(f"skipping event - malformed shape {normalized.shape}")
+    if shifted.shape != (WAVEFORM_LEN,):
+        print(f"skipping event - malformed shape {shifted.shape}")
         return
-    writer.add_trace(
+    writer.write_sample(
+        shifted.astype("float32"),
         {
             "source_type": metadata.source_type,
-            "event_id": metadata.get("event_id"),
+            "event_id": metadata.get("event_id"),  # Noise waveforms don't have ids.
             "station_network_code": metadata.station_network_code,
             "station_code": metadata.station_code,
             "station_location_code": metadata.station_location_code,
             "trace_start_time": trace_start_time,
         },
-        normalized,
     )
 
 
 def write_split(i_su, i_eq, i_ex, i_noise, base_path):
-    metadata_path = base_path / "metadata.csv"
-    waveforms_path = base_path / "waveforms.hdf5"
-    with seisbench.data.WaveformDataWriter(metadata_path, waveforms_path) as writer:
-        sampling_rate = 100
-        writer.data_format = {
-            "dimension_order": "CW",
-            "component_order": "ZNE",
-            "sampling_rate": sampling_rate,
-        }
+    with MyDatasetWriter(
+        base_path,
+        [
+            "source_type",
+            "event_id",
+            "station_network_code",
+            "station_code",
+            "station_location_code",
+            "trace_start_time",
+        ],
+    ) as writer:
         for indices, dataset in zip(
             [i_su, i_eq, i_ex, i_noise], [pnw_exotic, pnw, pnw, pnw_noise]
         ):
@@ -112,7 +90,7 @@ def write_split(i_su, i_eq, i_ex, i_noise, base_path):
                     dataset.get_waveforms(i),
                     dataset.metadata.loc[i],
                     writer,
-                    sampling_rate,
+                    sampling_rate=100,
                 )
 
 
