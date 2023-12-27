@@ -17,9 +17,13 @@ class MyDataset(Dataset):
         # Needed for PyTorch Dataset.
         return np.load(self.data_path / f"{i}.npy")
 
-    def __len__(self, i):
+    def __len__(self):
         # Needed for PyTorch Dataset.
         return len(self.metadata)
+
+    def get_sample(self, i):
+        # Needed for Seisbench WaveformDataset.
+        return self[i], self.metadata.loc[i].to_dict()
 
 
 class MyDatasetWriter:

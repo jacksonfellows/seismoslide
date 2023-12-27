@@ -12,7 +12,6 @@ def plot_sample_waveforms():
     fig, axs = plt.subplots(
         nrows=len(cats), ncols=N, layout="tight", sharex=True, sharey=True
     )
-    # plt.ylim(-500, 500)
     for cati, cat in enumerate(cats):
         axs[cati, 0].set_ylabel(cat)
         i = train.metadata[train.metadata.source_type == cat].index

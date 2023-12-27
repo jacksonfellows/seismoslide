@@ -34,19 +34,20 @@ np_gen = np.random.default_rng(123)
 
 
 def save_event(waveform, metadata, writer, sampling_rate):
-    WAVEFORM_LEN = 9000
+    WAVEFORM_LEN = 6000
+    PRE_ARRIVAL_LEN_SAMPLES = 3000
     waveform = waveform[0]  # Z component.
     if metadata.source_type != "noise":
         trace_P_arrival_sample = metadata.trace_P_arrival_sample
         if np.isnan(trace_P_arrival_sample):
-            print("skipping event - no trace_P_arrival_sample")
+            print(f"skipping {metadata.source_type} - no trace_P_arrival_sample")
             return
         shifted, shift_samples = shift_P_arrival(
             waveform,
             trace_P_arrival_sample,
             sampling_rate=sampling_rate,
             waveform_len_samples=WAVEFORM_LEN,
-            pre_arrival_len_samples=3000,
+            pre_arrival_len_samples=PRE_ARRIVAL_LEN_SAMPLES,
         )
         trace_start_time = (
             UTCDateTime(metadata.trace_start_time) + shift_samples / sampling_rate
@@ -55,7 +56,7 @@ def save_event(waveform, metadata, writer, sampling_rate):
         shifted = waveform[:WAVEFORM_LEN]
         trace_start_time = UTCDateTime(metadata.trace_start_time)
     if shifted.shape != (WAVEFORM_LEN,):
-        print(f"skipping event - malformed shape {shifted.shape}")
+        print(f"skipping {metadata.source_type} - malformed shape {shifted.shape}")
         return
     writer.write_sample(
         shifted.astype("float32"),
@@ -66,6 +67,9 @@ def save_event(waveform, metadata, writer, sampling_rate):
             "station_code": metadata.station_code,
             "station_location_code": metadata.station_location_code,
             "trace_start_time": trace_start_time,
+            "trace_P_arrival_sample": PRE_ARRIVAL_LEN_SAMPLES
+            if metadata.source_type != "noise"
+            else None,
         },
     )
 
@@ -80,6 +84,7 @@ def write_split(i_su, i_eq, i_ex, i_noise, base_path):
             "station_code",
             "station_location_code",
             "trace_start_time",
+            "trace_P_arrival_sample",
         ],
     ) as writer:
         for indices, dataset in zip(

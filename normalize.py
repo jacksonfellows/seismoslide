@@ -15,7 +15,9 @@ def taper(waveform, taper_len_s, freq):
 def normalize(waveform):
     """Normalize a waveform for testing/prediction."""
     normalized = scipy.signal.detrend(waveform)  # Should I also remove mean?
-    normalized /= np.std(normalized)  # std vs max?
+    stddev = np.std(normalized)
+    if stddev != 0:
+        normalized /= np.std(normalized)  # std vs max?
     normalized = taper(normalized, 1, 100)  # 1s taper
     # Same frequency range as EQTransformer.
     normalized = bandpass(
