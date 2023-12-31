@@ -155,11 +155,11 @@ def train_test_loop(
             do_loop(valid_loader, model, loss_fn, None, logger, do_train=False)
     except KeyboardInterrupt:
         pass
+    torch.save(model, path)
     artifact = wandb.Artifact("model", type="model")
     artifact.add_file(path)
     wandb.log_artifact(artifact)
     wandb.finish()
-    torch.save(model, path)
 
 
 def plot_model(model, X, y, S):
