@@ -15,16 +15,15 @@ class ConvBNReLU(nn.Sequential):
 class Classifier(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
-        base = 4
+        base = 8
         self.down = nn.Sequential(
             ConvBNReLU(1, 1 * base, 3, 2),
             ConvBNReLU(1 * base, 2 * base, 3, 2),
             ConvBNReLU(2 * base, 3 * base, 3, 2),
             ConvBNReLU(3 * base, 4 * base, 3, 2),
             ConvBNReLU(4 * base, 5 * base, 3, 2),
-            ConvBNReLU(5 * base, 6 * base, 3, 2),
         )
-        self.classify = nn.Conv1d(6 * base, num_classes, 1)
+        self.classify = nn.Conv1d(5 * base, num_classes, 1)
 
     def forward(self, x):
         x = x.unsqueeze(1)  # Insert channel dimension.
