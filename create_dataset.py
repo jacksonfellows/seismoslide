@@ -34,8 +34,8 @@ np_gen = np.random.default_rng(123)
 
 
 def save_event(waveform, metadata, writer, sampling_rate):
-    WAVEFORM_LEN = 6000
-    PRE_ARRIVAL_LEN_SAMPLES = 3000
+    WAVEFORM_LEN = 3900  # At least 1s before waveform.
+    PRE_ARRIVAL_LEN_SAMPLES = 1000
     waveform = waveform[0]  # Z component.
     if metadata.source_type != "noise":
         trace_P_arrival_sample = metadata.trace_P_arrival_sample
@@ -116,7 +116,7 @@ def make_splits(split_dir):
     assert i_su.shape == i_eq.shape == i_ex.shape == i_noise.shape
 
     # Split percentages:
-    train_p, valid_p, test_p = 0.6, 0.3, 0.1
+    train_p, valid_p, test_p = 0.8, 0.1, 0.1
     assert train_p * 100 + valid_p * 100 + test_p * 100 == 100
     train_i_su, valid_i_su, test_i_su = np.array_split(
         i_su, [int(train_p * len(i_su)), int((train_p + valid_p) * len(i_su))]
