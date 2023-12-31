@@ -108,12 +108,14 @@ class MetricLogger:
         with np.errstate(divide="ignore", invalid="ignore"):
             precision = self.TP / (self.TP + self.FP)
             recall = self.TP / (self.TP + self.FN)
+            f1 = 2 / (1 / precision + 1 / recall)
         log = {f"{split}/mean_loss": mean_loss}
         for classi, classl in enumerate(CLASSES):
             if classi == 0:
                 continue
             log[f"{split}/{classl}_precision"] = precision[classi - 1]
             log[f"{split}/{classl}_recall"] = recall[classi - 1]
+            log[f"{split}/{classl}_F1"] = f1[classi - 1]
         wandb.log(log)
         self.total_loss = 0
         self.TP[:] = self.FP[:] = self.FN[:] = 0
