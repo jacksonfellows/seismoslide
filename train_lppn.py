@@ -7,14 +7,14 @@ import train
 import wandb
 
 
-def train_lppn_model(S, base, path, epochs):
+def train_lppn_model(S, base, path, sigma, epochs):
     config = dict(
         model="LPPN",
         S=S,
         base=base,
         batch_size=64,
         min_distance=100,
-        sigma=50,
+        sigma=sigma,
     )
     sigmas = 4 * [config["sigma"]]
     wandb.init(project="seismoslide", config=config)
@@ -38,8 +38,13 @@ if __name__ == "__main__":
     parser.add_argument("--stride")
     parser.add_argument("--base")
     parser.add_argument("--path")
+    parser.add_argument("--sigma")
     parser.add_argument("--epochs")
     args = parser.parse_args()
     train_lppn_model(
-        S=int(args.stride), base=int(args.base), path=args.path, epochs=int(args.epochs)
+        S=int(args.stride),
+        base=int(args.base),
+        path=args.path,
+        sigma=int(args.sigma),
+        epochs=int(args.epochs),
     )
