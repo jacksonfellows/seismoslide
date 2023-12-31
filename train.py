@@ -41,7 +41,7 @@ def my_normalize(state_dict):
     state_dict["X"] = normalize(waveform).astype("float32"), metadata
 
 
-WINDOW_LEN = 3072
+WINDOW_LEN = 2 * 3072
 
 
 def make_generator(dataset, S, sigmas):

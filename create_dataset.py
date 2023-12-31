@@ -34,8 +34,8 @@ np_gen = np.random.default_rng(123)
 
 
 def save_event(waveform, metadata, writer, sampling_rate):
-    WAVEFORM_LEN = 3900  # At least 1s before waveform.
-    PRE_ARRIVAL_LEN_SAMPLES = 1000
+    WAVEFORM_LEN = 1000 + (2 * 3072) + 100  # At least 1s before waveform.
+    PRE_ARRIVAL_LEN_SAMPLES = 1500
     waveform = waveform[0]  # Z component.
     if metadata.source_type != "noise":
         trace_P_arrival_sample = metadata.trace_P_arrival_sample
