@@ -57,7 +57,7 @@ def make_generator(dataset, config):
     return gen
 
 
-def find_TP_FP_FN(y_true, y_pred_logits, distance_samples):
+def find_TP_FP_FN(y_true, y_pred_logits):
     # y_true.shape == y_pred_logits.shape == (num_classes, num_segments)
     y_pred = F.softmax(y_pred_logits, dim=0)
     TP, FP, FN = np.zeros(3), np.zeros(3), np.zeros(3)
@@ -79,7 +79,9 @@ def find_TP_FP_FN(y_true, y_pred_logits, distance_samples):
             if len(peaks_pred) == 0:
                 FN[classi - 1] += 1
             else:
-                close = np.sum(np.abs(peaks_pred - peaks_true[0]) < distance_samples)
+                close = np.sum(
+                    np.abs(peaks_pred - peaks_true[0]) < wandb.config["min_distance"]
+                )
                 TP[classi - 1] += close
                 FP[classi - 1] += len(peaks_pred) - close
     return TP, FP, FN
@@ -95,12 +97,7 @@ class MetricLogger:
     def update_batch(self, y, y_pred, loss):
         self.total_loss += loss
         for batchi in range(y.shape[0]):
-            tp, fp, fn = find_TP_FP_FN(
-                y[batchi],
-                y_pred[batchi].detach(),
-                wandb.config["min_distance"],
-                wandb.config["stride"],
-            )
+            tp, fp, fn = find_TP_FP_FN(y[batchi], y_pred[batchi].detach())
             self.TP += tp
             self.FP += fp
             self.FN += fn
