@@ -43,4 +43,4 @@ if __name__ == "__main__":
     parser.add_argument("--window_high")
     parser.add_argument("--epochs")
     args = parser.parse_args()
-    train_lppn_model(args)
+    train_lppn_model(vars(args))
