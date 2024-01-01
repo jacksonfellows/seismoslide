@@ -7,28 +7,30 @@ import train
 import wandb
 
 
-def train_lppn_model(args):
-    config = dict(
-        model="LPPN",
-        **args,
-        batch_size=64,
-        min_distance=100,
+def train_lppn_model():
+    model = lppn_model.Model(
+        n_stride=wandb.config["stride"], n_channel=wandb.config["base"]
     )
-    wandb.init(project="seismoslide", config=config)
-    model = lppn_model.Model(n_stride=config["stride"], n_channel=config["base"])
     train_loader = DataLoader(
-        train.make_generator(train.train_dataset, config),
-        config["batch_size"],
+        train.make_generator(train.train_dataset, wandb.config),
+        wandb.config["batch_size"],
         shuffle=True,
     )
     valid_loader = DataLoader(
-        train.make_generator(train.valid_dataset, config),
-        config["batch_size"],
+        train.make_generator(train.valid_dataset, wandb.config),
+        wandb.config["batch_size"],
         shuffle=True,
     )
-    logger = train.MetricLogger(min_distance=config["min_distance"], S=config["stride"])
+    logger = train.MetricLogger(
+        min_distance=wandb.config["min_distance"], S=wandb.config["stride"]
+    )
     train.train_test_loop(
-        model, train_loader, valid_loader, config["path"], config["epochs"], logger
+        model,
+        train_loader,
+        valid_loader,
+        wandb.config["path"],
+        wandb.config["epochs"],
+        logger,
     )
 
 
@@ -42,5 +44,13 @@ if __name__ == "__main__":
     parser.add_argument("--window_low", type=int)
     parser.add_argument("--window_high", type=int)
     parser.add_argument("--epochs", type=int)
-    args = parser.parse_args()
-    train_lppn_model(vars(args))
+    args = vars(parser.parse_args())
+    wandb.init(
+        project="seismoslide",
+        config=dict(
+            model="LPPN",
+            **args,
+            batch_size=64,
+            min_distance=100,
+        ),
+    )

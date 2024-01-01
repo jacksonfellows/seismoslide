@@ -118,6 +118,7 @@ class MetricLogger:
             log[f"{split}/{classl}_precision"] = precision[classi - 1]
             log[f"{split}/{classl}_recall"] = recall[classi - 1]
             log[f"{split}/{classl}_F1"] = f1[classi - 1]
+        log[f"{split}/mean_F1"] = np.mean(f1)
         wandb.log(log)
         self.total_loss = 0
         self.TP[:] = self.FP[:] = self.FN[:] = 0
