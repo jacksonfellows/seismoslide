@@ -57,17 +57,21 @@ def make_generator(dataset, config):
     return gen
 
 
-THRESHOLD = 0.3
-
-
-def find_TP_FP_FN(y_true, y_pred_logits, distance_samples, S):
+def find_TP_FP_FN(y_true, y_pred_logits, distance_samples):
     # y_true.shape == y_pred_logits.shape == (num_classes, num_segments)
     y_pred = F.softmax(y_pred_logits, dim=0)
     TP, FP, FN = np.zeros(3), np.zeros(3), np.zeros(3)
     for classi in range(1, len(CLASSES)):
-        peaks_true, _ = scipy.signal.find_peaks(y_true[classi], height=THRESHOLD)
-        peaks_pred, _ = scipy.signal.find_peaks(y_pred[classi], height=THRESHOLD)
-        peaks_true, peaks_pred = S * peaks_true, S * peaks_pred
+        peaks_true, _ = scipy.signal.find_peaks(
+            y_true[classi], height=wandb.config["threshold"]
+        )
+        peaks_pred, _ = scipy.signal.find_peaks(
+            y_pred[classi], height=wandb.config["threshold"]
+        )
+        peaks_true, peaks_pred = (
+            wandb.config["stride"] * peaks_true,
+            wandb.config["stride"] * peaks_pred,
+        )
         if len(peaks_true) == 0:
             FP[classi - 1] += len(peaks_pred)
         else:
@@ -195,3 +199,40 @@ def plot_model(model, X, y, S):
             )
     # plt.legend(loc="upper left")
     plt.show()
+
+
+# def optimize_threshold(model, dataloader):
+#     min_distance = 100
+#     thresholds = np.arange(0, 1, 0.1)
+#     TP, FP, FN = (
+#         np.zeros((len(thresholds), 3)),
+#         np.zeros((len(thresholds), 3)),
+#         np.zeros((len(thresholds), 3)),
+#     )
+#     n_batches = len(dataloader)
+#     model.eval()
+#     for i, d in enumerate(dataloader):
+#         if i % 10 == 0:
+#             print(f"{i}/{n_batches}")
+#         y = d["y"]
+#         y_pred = model(d["X"])
+#         for batchi in range(y.shape[0]):
+#             for thresholdi, threshold in enumerate(thresholds):
+#                 tp, fp, fn = find_TP_FP_FN(
+#                     y[batchi],
+#                     y_pred[batchi].detach(),
+#                     min_distance,
+#                     model.n_stride,
+#                     threshold,
+#                 )
+#                 TP[thresholdi] += tp
+#                 FP[thresholdi] += fp
+#                 FN[thresholdi] += fn
+#     with np.errstate(divide="ignore", invalid="ignore"):
+#         precision = TP / (TP + FP)
+#         recall = TP / (TP + FN)
+#         f1 = 2 / (1 / precision + 1 / recall)
+#     print(precision, recall, f1)
+#     print(np.argmax(np.mean(f1, axis=-1)))
+#     plt.plot(precision, recall)
+#     plt.show()

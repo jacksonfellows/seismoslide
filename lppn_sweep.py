@@ -1,3 +1,4 @@
+import math
 import sys
 import time
 
@@ -8,15 +9,18 @@ from train_lppn import train_lppn_model
 
 sweep_config = {
     "method": "random",
-    "name": "sweep1",
+    "name": "sweep2",
     "metric": {"name": "valid_epoch/mean_F1", "goal": "maximize"},
     "parameters": {
         "stride": {"values": [8, 16, 32, 64, 128]},
         "base": {"values": [4, 8, 16, 32, 64]},
-        "sigma": {"min": 10, "max": 250},
+        "sigma": {"min": 20, "max": 120},
         "window_len": {"values": [1536, 3072, 6144]},
-        "lr": {"max": 0.1, "min": 0.0001},
-        "batch_size": {"values": [32, 64]},
+        "lr": {
+            "distribution": "log_uniform_values",
+            "max": 0.01,
+            "min": 0.0001,
+        },
     },
 }
 
@@ -27,6 +31,8 @@ def do_sweep():
         "min_distance": 100,
         "window_low": 0,
         "epochs": 10,
+        "batch_size": 64,
+        "threshold": 0.7,
     }
     with wandb.init(config=default_config):
         # Set window_high based on window_len.
