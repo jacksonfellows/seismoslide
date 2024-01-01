@@ -1,6 +1,8 @@
 import sys
 import time
 
+import torch
+
 import wandb
 from train_lppn import train_lppn_model
 
@@ -31,6 +33,7 @@ def do_sweep():
         wandb.config["window_high"] = wandb.config["window_len"] + 1500 - 200
         # Set a unique path.
         wandb.config["path"] = f"sweep_{int(time.time())}.pt"
+        torch.set_num_threads(1)
         train_lppn_model()
 
 
