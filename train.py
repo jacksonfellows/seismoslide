@@ -18,20 +18,19 @@ valid_dataset = MyDataset("./pnw_splits/valid")
 CLASSES = ["noise", "earthquake", "explosion", "surface event"]
 
 
-def add_classif_output(state_dict, S, sigmas):
+def add_classif_output(state_dict, config):
     waveform, metadata = state_dict["X"]
     P_arrival_sample = metadata.get("trace_P_arrival_sample")
-    assert len(waveform) % S == 0
-    N = len(waveform) // S
+    assert len(waveform) % config["stride"] == 0
+    N = len(waveform) // config["stride"]
     probs = np.zeros((len(CLASSES), N), dtype="float32")
     if metadata["source_type"] == "noise":
         probs[0] = 1
     else:
         classi = CLASSES.index(metadata["source_type"])
-        sigma = sigmas[classi]
-        x = np.arange(N) * S
+        x = np.arange(N) * config["stride"]
         onset = P_arrival_sample
-        probs[classi] = np.exp(-((x - onset) ** 2) / (2 * sigma**2))
+        probs[classi] = np.exp(-((x - onset) ** 2) / (2 * config["sigma"] ** 2))
         probs[0] = 1 - probs[classi]
     state_dict["y"] = (probs, None)  # Need to indicate empty metadata!
 
@@ -41,12 +40,15 @@ def my_normalize(state_dict):
     state_dict["X"] = normalize(waveform).astype("float32"), metadata
 
 
-WINDOW_LEN = 2 * 3072
-
-
-def make_generator(dataset, S, sigmas):
+def make_generator(dataset, config):
     gen = sbg.GenericGenerator(dataset)
-    gen.augmentation(sbg.RandomWindow(windowlen=WINDOW_LEN))
+    gen.augmentation(
+        sbg.RandomWindow(
+            windowlen=config["window_len"],
+            low=config["window_low"],
+            high=config["window_high"],
+        )
+    )
     # TODO: Explore normalization options.
     # gen.augmentation(
     #     sbg.Normalize(
@@ -54,7 +56,7 @@ def make_generator(dataset, S, sigmas):
     #     )
     # )
     gen.augmentation(my_normalize)
-    gen.augmentation(lambda x: add_classif_output(x, S, sigmas))
+    gen.augmentation(lambda x: add_classif_output(x, config))
     return gen
 
 

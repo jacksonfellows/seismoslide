@@ -34,7 +34,7 @@ np_gen = np.random.default_rng(123)
 
 
 def save_event(waveform, metadata, writer, sampling_rate):
-    WAVEFORM_LEN = 1000 + (2 * 3072) + 100  # At least 1s before waveform.
+    WAVEFORM_LEN = 1500 + 6000  # Max possible len for 1 min windows.
     PRE_ARRIVAL_LEN_SAMPLES = 1500
     waveform = waveform[0]  # Z component.
     if metadata.source_type != "noise":
