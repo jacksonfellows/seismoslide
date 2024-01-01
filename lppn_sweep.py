@@ -26,7 +26,7 @@ def do_sweep():
         "window_low": 0,
         "epochs": 10,
     }
-    with wandb.init(default_config):
+    with wandb.init(config=default_config):
         # Set window_high based on window_len.
         wandb.config["window_high"] = wandb.config["window_len"] + 1500 - 200
         # Set a unique path.
@@ -36,4 +36,4 @@ def do_sweep():
 
 if __name__ == "__main__":
     sweep_id = sys.argv[1]
-    wandb.agent(sweep_id, function=do_sweep, count=4)
+    wandb.agent(sweep_id, function=do_sweep, count=4, project="seismoslide")
