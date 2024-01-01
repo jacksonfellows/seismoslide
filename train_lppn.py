@@ -21,16 +21,12 @@ def train_lppn_model():
         wandb.config["batch_size"],
         shuffle=True,
     )
-    logger = train.MetricLogger(
-        min_distance=wandb.config["min_distance"], S=wandb.config["stride"]
-    )
     train.train_test_loop(
         model,
         train_loader,
         valid_loader,
         wandb.config["path"],
         wandb.config["epochs"],
-        logger,
     )
 
 
@@ -54,3 +50,4 @@ if __name__ == "__main__":
             min_distance=100,
         ),
     )
+    train_lppn_model()

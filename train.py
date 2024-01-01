@@ -4,10 +4,7 @@ import seisbench.generate as sbg
 import torch
 import torch.nn.functional as F
 from matplotlib import pyplot as plt
-from torch.utils.data import DataLoader
 
-import lppn_model
-import models
 import wandb
 from mydataset import MyDataset
 from normalize import normalize
@@ -85,9 +82,8 @@ def find_TP_FP_FN(y_true, y_pred_logits, distance_samples, S):
 
 
 class MetricLogger:
-    def __init__(self, min_distance, S):
-        self.min_distance = min_distance
-        self.S = S
+    def __init__(self, split):
+        self.split = split
         self.TP, self.FP, self.FN = np.zeros(3), np.zeros(3), np.zeros(3)
         self.total_loss = 0
         self.n_batches = 0
@@ -96,14 +92,17 @@ class MetricLogger:
         self.total_loss += loss
         for batchi in range(y.shape[0]):
             tp, fp, fn = find_TP_FP_FN(
-                y[batchi], y_pred[batchi].detach(), self.min_distance, self.S
+                y[batchi],
+                y_pred[batchi].detach(),
+                wandb.config["min_distance"],
+                wandb.config["stride"],
             )
             self.TP += tp
             self.FP += fp
             self.FN += fn
         self.n_batches += 1
 
-    def do_log(self, split):
+    def do_log(self):
         if self.n_batches == 0:
             return
         mean_loss = self.total_loss / self.n_batches
@@ -111,30 +110,33 @@ class MetricLogger:
             precision = self.TP / (self.TP + self.FP)
             recall = self.TP / (self.TP + self.FN)
             f1 = 2 / (1 / precision + 1 / recall)
-        log = {f"{split}/mean_loss": mean_loss}
+        log = {f"{self.split}/mean_loss": mean_loss}
         for classi, classl in enumerate(CLASSES):
             if classi == 0:
                 continue
-            log[f"{split}/{classl}_precision"] = precision[classi - 1]
-            log[f"{split}/{classl}_recall"] = recall[classi - 1]
-            log[f"{split}/{classl}_F1"] = f1[classi - 1]
-        log[f"{split}/mean_F1"] = np.mean(f1)
+            log[f"{self.split}/{classl}_precision"] = precision[classi - 1]
+            log[f"{self.split}/{classl}_recall"] = recall[classi - 1]
+            log[f"{self.split}/{classl}_F1"] = f1[classi - 1]
+        log[f"{self.split}/mean_F1"] = np.mean(f1)
         wandb.log(log)
         self.total_loss = 0
         self.TP[:] = self.FP[:] = self.FN[:] = 0
         self.n_batches = 0
 
 
-def do_loop(dataloader, model, loss_fn, optimizer, logger: MetricLogger, do_train):
+def do_loop(dataloader, model, loss_fn, optimizer, do_train):
     if do_train:
         model.train()
     else:
         model.eval()
     n_batches = len(dataloader)
+    split = "train" if do_train else "valid"
+    batch_logger = MetricLogger(split)
+    epoch_logger = MetricLogger(f"{split}_epoch")
     for i, d in enumerate(dataloader):
         if i % 10 == 0:
             print(f"{i}/{n_batches}")
-            logger.do_log("train" if do_train else "valid")
+            batch_logger.do_log()
         y = d["y"]
         y_pred = model(d["X"])
         loss = loss_fn(y_pred, y)
@@ -142,22 +144,23 @@ def do_loop(dataloader, model, loss_fn, optimizer, logger: MetricLogger, do_trai
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
-        logger.update_batch(y, y_pred, loss)
+        batch_logger.update_batch(y, y_pred, loss)
+        epoch_logger.update_batch(y, y_pred, loss)
+    epoch_logger.do_log()
 
 
-def train_test_loop(
-    model, train_loader, valid_loader, path, epochs, logger: MetricLogger
-):
+def train_test_loop(model, train_loader, valid_loader, path, epochs):
     wandb.watch(model, log_freq=100)
     wandb.config["optimizer"] = "Adam"
     wandb.config["lr"] = 0.001
     optimizer = torch.optim.Adam(model.parameters(), lr=wandb.config["lr"])
     loss_fn = torch.nn.CrossEntropyLoss()
+
     try:
         for epoch in range(epochs):
             print(f"{epoch=}")
-            do_loop(train_loader, model, loss_fn, optimizer, logger, do_train=True)
-            do_loop(valid_loader, model, loss_fn, None, logger, do_train=False)
+            do_loop(train_loader, model, loss_fn, optimizer, do_train=True)
+            do_loop(valid_loader, model, loss_fn, None, do_train=False)
     except KeyboardInterrupt:
         pass
     torch.save(model, path)

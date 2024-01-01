@@ -9,14 +9,14 @@ from train_lppn import train_lppn_model
 sweep_config = {
     "method": "random",
     "name": "sweep1",
-    "metric": {"name": "mean_F1", "goal": "maximize"},
+    "metric": {"name": "valid_epoch/mean_F1", "goal": "maximize"},
     "parameters": {
         "stride": {"values": [8, 16, 32, 64, 128]},
         "base": {"values": [4, 8, 16, 32, 64]},
-        "sigma": {"values": [25, 50, 100, 150]},
+        "sigma": {"min": 10, "max": 250},
         "window_len": {"values": [1536, 3072, 6144]},
         "lr": {"max": 0.1, "min": 0.0001},
-        "batch_size": {"values": [32, 64, 128]},
+        "batch_size": {"values": [32, 64]},
     },
 }
 
