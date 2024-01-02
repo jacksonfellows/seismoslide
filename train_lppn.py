@@ -40,6 +40,7 @@ if __name__ == "__main__":
     parser.add_argument("--window_low", type=int)
     parser.add_argument("--window_high", type=int)
     parser.add_argument("--epochs", type=int)
+    parser.add_argument("--threshold", type=float)
     args = vars(parser.parse_args())
     wandb.init(
         project="seismoslide",
