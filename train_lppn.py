@@ -12,12 +12,12 @@ def train_lppn_model():
         n_stride=wandb.config["stride"], n_channel=wandb.config["base"]
     )
     train_loader = DataLoader(
-        train.make_generator(train.train_dataset, wandb.config),
+        train.make_generator(train.train_dataset),
         wandb.config["batch_size"],
         shuffle=True,
     )
     valid_loader = DataLoader(
-        train.make_generator(train.valid_dataset, wandb.config),
+        train.make_generator(train.valid_dataset),
         wandb.config["batch_size"],
         shuffle=True,
     )
