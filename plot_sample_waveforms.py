@@ -18,6 +18,8 @@ def plot_sample_waveforms():
         for n in range(N):
             waveform = train[i[n]]
             waveform = normalize(waveform)
+            arrival = train.metadata.iloc[i[n]].get("trace_P_arrival_sample")
             axs[cati, n].plot(waveform)
-            axs[cati, n].vlines(3000, -8, 8, color="red")
+            if arrival:
+                axs[cati, n].vlines(arrival, -8, 8, color="red")
     plt.show()
