@@ -107,7 +107,7 @@ class MetricLogger:
     def update_batch(self, y, y_pred, loss):
         self.total_loss += loss
         for batchi in range(y.shape[0]):
-            tp, fp, fn = find_TP_FP_FN(y[batchi], y_pred[batchi].detach())
+            tp, fp, fn = find_TP_FP_FN(y[batchi], y_pred[batchi])
             self.TP += tp
             self.FP += fp
             self.FN += fn
@@ -155,8 +155,10 @@ def do_loop(dataloader, model, loss_fn, optimizer, do_train):
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
-        batch_logger.update_batch(y, y_pred, loss)
-        epoch_logger.update_batch(y, y_pred, loss)
+        y_pred_detached = y_pred.detach()
+        loss_detached = loss.detach()
+        batch_logger.update_batch(y, y_pred_detached, loss_detached)
+        epoch_logger.update_batch(y, y_pred_detached, loss_detached)
     epoch_logger.do_log()
 
 
