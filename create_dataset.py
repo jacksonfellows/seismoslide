@@ -37,6 +37,9 @@ def save_event(waveform, metadata, writer, sampling_rate):
     WAVEFORM_LEN = 1500 + 6000  # Max possible len for 1 min windows.
     PRE_ARRIVAL_LEN_SAMPLES = 1500
     waveform = waveform[0]  # Z component.
+    if np.all(waveform == 0):
+        print(f"skipping {metadata.source_type} - 0'd waveform")
+        return
     if metadata.source_type != "noise":
         trace_P_arrival_sample = metadata.trace_P_arrival_sample
         if np.isnan(trace_P_arrival_sample):
@@ -108,12 +111,12 @@ def make_splits(split_dir):
     # Surface event indices: Random permutation of all events.
     i_su = np_gen.permutation(all_su.index.to_numpy())
 
-    # Take as many earthquakes, explosions, and noise as there are surface events.
-    i_eq = np_gen.choice(all_eq.index.to_numpy(), size=len(i_su))
-    i_ex = np_gen.choice(all_ex.index.to_numpy(), size=len(i_su))
-    i_noise = np_gen.choice(all_noise.index.to_numpy(), size=len(i_su))
+    # Twice as many earthquakes and explosions.
+    i_eq = np_gen.choice(all_eq.index.to_numpy(), size=2 * len(i_su))
+    i_ex = np_gen.choice(all_ex.index.to_numpy(), size=2 * len(i_su))
 
-    assert i_su.shape == i_eq.shape == i_ex.shape == i_noise.shape
+    # Equal amount of noise.
+    i_noise = np_gen.choice(all_noise.index.to_numpy(), size=len(i_su))
 
     # Split percentages:
     train_p, valid_p, test_p = 0.8, 0.1, 0.1
