@@ -9,18 +9,16 @@ from train_lppn import train_lppn_model
 
 sweep_config = {
     "method": "random",
-    "name": "sweep3",
+    "name": "sweep4",
+    "description": "Test forms of pick labeling.",
     "metric": {"name": "valid_epoch/mean_F1", "goal": "maximize"},
     "parameters": {
-        "stride": {"values": [8, 16, 32, 64, 128]},
-        "base": {"values": [4, 8, 16, 32, 64]},
-        "sigma": {"value": 100},
-        "window_len": {"values": [1536, 3072, 6144]},
-        "lr": {
-            "distribution": "log_uniform_values",
-            "max": 0.01,
-            "min": 0.0001,
-        },
+        "stride": {"value": 32},
+        "base": {"value": 32},
+        "sigma": {"values": [25, 50, 100, 150]},
+        "window_len": {"value": 6144},
+        "lr": {"value": 0.001},
+        "pick_label_type": {"values": ["Gaussian", "triangular"]},
     },
 }
 

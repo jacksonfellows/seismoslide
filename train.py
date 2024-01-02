@@ -15,6 +15,16 @@ valid_dataset = MyDataset("./pnw_splits/valid")
 CLASSES = ["noise", "earthquake", "explosion", "surface event"]
 
 
+def make_proba_pick(onset):
+    N = wandb.config["window_len"] // wandb.config["stride"]
+    x = np.arange(N) * wandb.config["stride"]
+    if wandb.config["pick_label_type"] == "Gaussian":
+        return np.exp(-((x - onset) ** 2) / (2 * wandb.config["sigma"] ** 2))
+    if wandb.config["pick_label_type"] == "triangular":
+        return np.clip(np.abs(x - onset), 0)
+    raise ValueError(f"unsupported pick_label_type {wandb.config['pick_label_type']}")
+
+
 def add_classif_output(state_dict):
     waveform, metadata = state_dict["X"]
     P_arrival_sample = metadata.get("trace_P_arrival_sample")
@@ -25,9 +35,8 @@ def add_classif_output(state_dict):
         probs[0] = 1
     else:
         classi = CLASSES.index(metadata["source_type"])
-        x = np.arange(N) * wandb.config["stride"]
         onset = P_arrival_sample
-        probs[classi] = np.exp(-((x - onset) ** 2) / (2 * wandb.config["sigma"] ** 2))
+        probs[classi] = make_proba_pick(onset)
         probs[0] = 1 - probs[classi]
     state_dict["y"] = (probs, None)  # Need to indicate empty metadata!
 
