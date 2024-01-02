@@ -15,19 +15,19 @@ valid_dataset = MyDataset("./pnw_splits/valid")
 CLASSES = ["noise", "earthquake", "explosion", "surface event"]
 
 
-def add_classif_output(state_dict, config):
+def add_classif_output(state_dict):
     waveform, metadata = state_dict["X"]
     P_arrival_sample = metadata.get("trace_P_arrival_sample")
-    assert len(waveform) % config["stride"] == 0
-    N = len(waveform) // config["stride"]
+    assert len(waveform) % wandb.config["stride"] == 0
+    N = len(waveform) // wandb.config["stride"]
     probs = np.zeros((len(CLASSES), N), dtype="float32")
     if metadata["source_type"] == "noise":
         probs[0] = 1
     else:
         classi = CLASSES.index(metadata["source_type"])
-        x = np.arange(N) * config["stride"]
+        x = np.arange(N) * wandb.config["stride"]
         onset = P_arrival_sample
-        probs[classi] = np.exp(-((x - onset) ** 2) / (2 * config["sigma"] ** 2))
+        probs[classi] = np.exp(-((x - onset) ** 2) / (2 * wandb.config["sigma"] ** 2))
         probs[0] = 1 - probs[classi]
     state_dict["y"] = (probs, None)  # Need to indicate empty metadata!
 
@@ -37,13 +37,13 @@ def my_normalize(state_dict):
     state_dict["X"] = normalize(waveform).astype("float32"), metadata
 
 
-def make_generator(dataset, config):
+def make_generator(dataset):
     gen = sbg.GenericGenerator(dataset)
     gen.augmentation(
         sbg.RandomWindow(
-            windowlen=config["window_len"],
-            low=config["window_low"],
-            high=config["window_high"],
+            windowlen=wandb.config["window_len"],
+            low=wandb.config["window_low"],
+            high=wandb.config["window_high"],
         )
     )
     # TODO: Explore normalization options.
@@ -53,7 +53,7 @@ def make_generator(dataset, config):
     #     )
     # )
     gen.augmentation(my_normalize)
-    gen.augmentation(lambda x: add_classif_output(x, config))
+    gen.augmentation(add_classif_output)
     return gen
 
 
@@ -169,67 +169,3 @@ def train_test_loop(model, train_loader, valid_loader, path, epochs):
     artifact.add_file(path)
     wandb.log_artifact(artifact)
     wandb.finish()
-
-
-def plot_model(model, X, y, S):
-    y = y.detach().numpy()
-    y_logits = model(X)
-    y_prob = F.softmax(y_logits, dim=1).detach().numpy()
-    fig, axs = plt.subplots(
-        nrows=2, ncols=X.shape[0], sharex=True, sharey="row", layout="tight"
-    )
-    for i in range(X.shape[0]):
-        axs[0, i].plot(X[i])
-        for classi, (classl, color) in enumerate(
-            zip(CLASSES, ["blue", "red", "yellow", "green"])
-        ):
-            axs[1, i].plot(
-                y[i, classi].repeat(S),
-                label=f"expected {classl}",
-                color=color,
-            )
-            axs[1, i].plot(
-                y_prob[i, classi].repeat(S),
-                label=f"output {classl}",
-                color=color,
-                linestyle="dashed",
-            )
-    # plt.legend(loc="upper left")
-    plt.show()
-
-
-# def optimize_threshold(model, dataloader):
-#     min_distance = 100
-#     thresholds = np.arange(0, 1, 0.1)
-#     TP, FP, FN = (
-#         np.zeros((len(thresholds), 3)),
-#         np.zeros((len(thresholds), 3)),
-#         np.zeros((len(thresholds), 3)),
-#     )
-#     n_batches = len(dataloader)
-#     model.eval()
-#     for i, d in enumerate(dataloader):
-#         if i % 10 == 0:
-#             print(f"{i}/{n_batches}")
-#         y = d["y"]
-#         y_pred = model(d["X"])
-#         for batchi in range(y.shape[0]):
-#             for thresholdi, threshold in enumerate(thresholds):
-#                 tp, fp, fn = find_TP_FP_FN(
-#                     y[batchi],
-#                     y_pred[batchi].detach(),
-#                     min_distance,
-#                     model.n_stride,
-#                     threshold,
-#                 )
-#                 TP[thresholdi] += tp
-#                 FP[thresholdi] += fp
-#                 FN[thresholdi] += fn
-#     with np.errstate(divide="ignore", invalid="ignore"):
-#         precision = TP / (TP + FP)
-#         recall = TP / (TP + FN)
-#         f1 = 2 / (1 / precision + 1 / recall)
-#     print(precision, recall, f1)
-#     print(np.argmax(np.mean(f1, axis=-1)))
-#     plt.plot(precision, recall)
-#     plt.show()
