@@ -15,7 +15,7 @@ sweep_config = {
     "parameters": {
         "stride": {"value": 32},
         "base": {"value": 32},
-        "sigma": {"values": [25, 50, 100, 150]},
+        "sigma": {"min": 25, "max": 250},
         "window_len": {"value": 6144},
         "lr": {"value": 0.001},
         "pick_label_type": {"values": ["Gaussian", "triangular"]},

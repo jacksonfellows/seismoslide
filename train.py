@@ -21,7 +21,7 @@ def make_proba_pick(onset):
     if wandb.config["pick_label_type"] == "Gaussian":
         return np.exp(-((x - onset) ** 2) / (2 * wandb.config["sigma"] ** 2))
     if wandb.config["pick_label_type"] == "triangular":
-        return np.clip(np.abs(x - onset), 0)
+        return np.clip(1 - np.abs(x - onset) / wandb.config["sigma"], 0, 1)
     raise ValueError(f"unsupported pick_label_type {wandb.config['pick_label_type']}")
 
 
@@ -35,7 +35,8 @@ def add_classif_output(state_dict):
         probs[0] = 1
     else:
         classi = CLASSES.index(metadata["source_type"])
-        onset = P_arrival_sample
+        # Round onset to nearest bin.
+        onset = wandb.config["stride"] * (P_arrival_sample // wandb.config["stride"])
         probs[classi] = make_proba_pick(onset)
         probs[0] = 1 - probs[classi]
     state_dict["y"] = (probs, None)  # Need to indicate empty metadata!
