@@ -47,6 +47,11 @@ def my_normalize(state_dict):
     state_dict["X"] = normalize(waveform).astype("float32"), metadata
 
 
+def add_channel_dim(state_dict):
+    waveform, metadata = state_dict["X"]
+    state_dict["X"] = waveform[None, ...], metadata
+
+
 def make_generator(dataset):
     gen = sbg.GenericGenerator(dataset)
     gen.augmentation(
@@ -64,6 +69,8 @@ def make_generator(dataset):
     # )
     gen.augmentation(my_normalize)
     gen.augmentation(add_classif_output)
+    if wandb.config.get("add_channel_dim"):
+        gen.augmentation(add_channel_dim)
     return gen
 
 
@@ -167,7 +174,12 @@ def train_test_loop(model, train_loader, valid_loader, path, epochs):
     wandb.config["optimizer"] = "Adam"
     wandb.config["lr"] = 0.001
     optimizer = torch.optim.Adam(model.parameters(), lr=wandb.config["lr"])
-    loss_fn = torch.nn.CrossEntropyLoss()
+    if wandb.config["loss_fn"] == "cross_entropy_loss":
+        loss_fn = torch.nn.CrossEntropyLoss()
+    elif wandb.config["loss_fn"] == "binary_cross_entropy_loss":
+        loss_fn = torch.nn.BCELoss()
+    else:
+        raise ValueError(f"invalid loss function {wandb.config['loss_fn']}")
 
     try:
         for epoch in range(epochs):
