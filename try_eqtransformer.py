@@ -2,12 +2,13 @@ import seisbench.models
 import torch
 from torch.utils.data import DataLoader
 
+import my_eqt_model
 import train
 import wandb
 
 
 def main():
-    model = seisbench.models.EQTransformer(
+    model = my_eqt_model.EQTransformer(
         in_channels=1,
         in_samples=6000,
         classes=3,
@@ -34,7 +35,6 @@ def main():
             window_low=0,
             window_high=6000 + 1500 - 200,
             path="my_eqt_01.pt",
-            loss_fn="binary_cross_entropy_loss",
             add_channel_dim="true",
         ),
     )
