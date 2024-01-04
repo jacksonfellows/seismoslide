@@ -1,4 +1,6 @@
-import seisbench.models
+import sys
+import time
+
 import torch
 from torch.utils.data import DataLoader
 
