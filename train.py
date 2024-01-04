@@ -170,7 +170,6 @@ def do_loop(dataloader, model, loss_fn, optimizer, do_train):
 def train_test_loop(model, train_loader, valid_loader, path, epochs):
     wandb.watch(model, log_freq=100)
     wandb.config["optimizer"] = "Adam"
-    wandb.config["lr"] = 0.001
     optimizer = torch.optim.Adam(model.parameters(), lr=wandb.config["lr"])
     loss_fn = torch.nn.CrossEntropyLoss()
 
