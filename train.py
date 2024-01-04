@@ -38,7 +38,6 @@ def add_classif_output(state_dict):
         # Round onset to nearest bin.
         onset = wandb.config["stride"] * (P_arrival_sample // wandb.config["stride"])
         probs[classi] = make_proba_pick(onset)
-        probs[0] = 1 - probs[classi]
     state_dict["y"] = (probs, None)  # Need to indicate empty metadata!
 
 
