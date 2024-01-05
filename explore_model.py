@@ -13,8 +13,7 @@ import train
 import wandb
 
 
-def plot_results(X, y, y_pred_logits):
-    y_prob = F.softmax(y_pred_logits, dim=0).numpy()
+def plot_results(X, y, y_pred):
     fig, axs = plt.subplots(nrows=2, ncols=1, sharex=True, sharey="row", layout="tight")
     axs[0].plot(X)
     for classi, (classl, color) in enumerate(
@@ -26,12 +25,13 @@ def plot_results(X, y, y_pred_logits):
             color=color,
         )
         axs[1].plot(
-            y_prob[classi].repeat(wandb.config["stride"]),
+            y_pred[classi].repeat(wandb.config["stride"]),
             label=f"output {classl}",
             color=color,
             linestyle="dashed",
         )
     plt.show()
+    plt.close(fig)  # ?
 
 
 api = wandb.Api()
@@ -57,11 +57,10 @@ def plot(config, model):
     wandb.config["threshold"] = 0.5
     d = next(iter(valid_loader))
     X, y = d["X"], d["y"]
-    y_pred_logits = model(X).detach()
+    y_pred = model(X).detach()
     X, y = X.detach().numpy(), y.detach().numpy()
     for batchi in range(X.shape[0]):
-        tp, fp, fn = train.find_TP_FP_FN(y[batchi], y_pred_logits[batchi])
+        tp, fp, fn = train.find_TP_FP_FN(y[batchi], y_pred[batchi])
         if fp.sum() != 0 or fn.sum() != 0:
-            print(batchi)
-            plot_results(X[batchi], y[batchi], y_pred_logits[batchi])
-            plt.close()
+            plot_results(X[batchi][0], y[batchi], y_pred[batchi])
+            # return

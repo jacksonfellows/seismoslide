@@ -73,9 +73,8 @@ def make_generator(dataset):
     return gen
 
 
-def find_TP_FP_FN(y_true, y_pred_logits):
-    # y_true.shape == y_pred_logits.shape == (num_classes, num_segments)
-    y_pred = F.softmax(y_pred_logits, dim=0)
+def find_TP_FP_FN(y_true, y_pred):
+    # y_true.shape == y_pred.shape == (num_classes, num_segments)
     TP, FP, FN = np.zeros(3), np.zeros(3), np.zeros(3)
     for classi in range(len(CLASSES)):
         peaks_true, _ = scipy.signal.find_peaks(
@@ -170,7 +169,7 @@ def train_test_loop(model, train_loader, valid_loader, path, epochs):
     wandb.watch(model, log_freq=100)
     wandb.config["optimizer"] = "Adam"
     optimizer = torch.optim.Adam(model.parameters(), lr=wandb.config["lr"])
-    loss_fn = torch.nn.BCEWithLogitsLoss()
+    loss_fn = torch.nn.BCELoss()
 
     try:
         for epoch in range(epochs):

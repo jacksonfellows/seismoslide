@@ -232,7 +232,7 @@ class EQTransformer(WaveformModel):
         self.pick_decoders = nn.ModuleList(self.pick_decoders)
         self.pick_convs = nn.ModuleList(self.pick_convs)
 
-    def forward(self, x, logits=True):
+    def forward(self, x, logits=False):
         assert x.ndim == 3
         assert x.shape[1:] == (self.in_channels, self.in_samples)
 
