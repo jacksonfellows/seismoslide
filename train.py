@@ -170,7 +170,7 @@ def train_test_loop(model, train_loader, valid_loader, path, epochs):
     wandb.watch(model, log_freq=100)
     wandb.config["optimizer"] = "Adam"
     optimizer = torch.optim.Adam(model.parameters(), lr=wandb.config["lr"])
-    loss_fn = torch.nn.CrossEntropyLoss()
+    loss_fn = torch.nn.BCEWithLogitsLoss()
 
     try:
         for epoch in range(epochs):
