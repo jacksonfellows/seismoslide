@@ -10,14 +10,15 @@ import wandb
 
 sweep_config = {
     "method": "random",
-    "name": "sweep_eqt_1",
-    "description": "Try out EQT.",
+    "name": "sweep_eqt_2",
+    "description": "Figure stuff out hopefully?",
     "metric": {"name": "valid_epoch/mean_F1", "goal": "maximize"},
     "parameters": {
         "window_len": {"values": [3000, 6000]},
-        "lr": {"value": 0.001},
-        "pick_label_type": {"values": ["Gaussian", "triangular"]},
-        "sigma": {"values": [20, 100, 150]},
+        "lr": {"values": 0.001},
+        "pick_label_type": {"value": "triangular"},
+        "sigma": {"values": [20, 100]},
+        "epochs": {"value": 25},
     },
 }
 
@@ -26,7 +27,6 @@ def do_sweep():
     default_config = {
         "min_distance": 100,
         "window_low": 0,
-        "epochs": 10,
         "batch_size": 64,
         "threshold": 0.5,
         "model": "My EQT 1",
