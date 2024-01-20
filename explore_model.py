@@ -1,3 +1,4 @@
+import json
 import os
 import tempfile
 from pathlib import Path
@@ -5,34 +6,10 @@ from pathlib import Path
 import numpy as np
 import torch
 import torch.functional as F
-import torch.nn.functional as F
-from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader
 
 import train
 import wandb
-
-
-def plot_results(X, y, y_pred):
-    fig, axs = plt.subplots(nrows=2, ncols=1, sharex=True, sharey="row", layout="tight")
-    axs[0].plot(X)
-    for classi, (classl, color) in enumerate(
-        zip(train.CLASSES, ["blue", "red", "yellow", "green"])
-    ):
-        axs[1].plot(
-            y[classi].repeat(wandb.config["stride"]),
-            label=f"expected {classl}",
-            color=color,
-        )
-        axs[1].plot(
-            y_pred[classi].repeat(wandb.config["stride"]),
-            label=f"output {classl}",
-            color=color,
-            linestyle="dashed",
-        )
-    plt.show()
-    plt.close(fig)  # ?
-
 
 api = wandb.Api()
 
@@ -47,20 +24,31 @@ def load_run(run_path):
     return run.config, model
 
 
-def plot(config, model):
+def apply_to_valid(config, model):
     wandb.config = config
     valid_loader = DataLoader(
         train.make_generator(train.valid_dataset),
         wandb.config["batch_size"],
         shuffle=True,
     )
-    wandb.config["threshold"] = 0.5
-    d = next(iter(valid_loader))
-    X, y = d["X"], d["y"]
-    y_pred = model(X).detach()
-    X, y = X.detach().numpy(), y.detach().numpy()
-    for batchi in range(X.shape[0]):
-        tp, fp, fn = train.find_TP_FP_FN(y[batchi], y_pred[batchi])
-        if fp.sum() != 0 or fn.sum() != 0:
-            plot_results(X[batchi][0], y[batchi], y_pred[batchi])
-            # return
+    dirpath = Path("valid_" + Path(config["path"]).stem)
+    if dirpath.exists():
+        raise ValueError(f"Directory {dirpath} already exists!")
+    dirpath.mkdir()
+    # Save config.
+    with open(dirpath / "config.json", "w") as f:
+        json.dump(config, f)
+    n_batches = len(valid_loader)
+    for i, d in enumerate(valid_loader):
+        batchpath = dirpath / f"{i}.npz"
+        if i % 10 == 0:
+            print(f"{i}/{n_batches}")
+        y = d["y"]
+        X = d["X"]
+        y_pred = model(X)
+        np.savez_compressed(
+            batchpath,
+            y=y.detach().numpy(),
+            X=X.detach().numpy(),
+            y_pred=y_pred.detach().numpy(),
+        )
