@@ -33,6 +33,19 @@ def plot_results(X, y, y_pred):
     plt.close(fig)  # ?
 
 
+def plot_failures(path):
+    with open(Path(path).parent / "config.json", "r") as f:
+        config = json.load(f)
+    wandb.config = config
+    npz = np.load(path)
+    X, y, y_pred = npz["X"][:, 0], npz["y"], npz["y_pred"]
+    for batchi in range(X.shape[0]):
+        tp, fp, fn = find_TP_FP_FN(y[batchi], y_pred[batchi])
+        if fp.sum() != 0 or fn.sum() != 0:
+            print(tp, fp, fn)
+            plot_results(X[batchi], y[batchi], y_pred[batchi])
+
+
 def compute_stats(dirpath, threshold=0.5):
     dirpath = Path(dirpath)
     with open(dirpath / "config.json", "r") as f:
