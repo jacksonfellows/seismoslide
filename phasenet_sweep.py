@@ -15,7 +15,7 @@ sweep_config = {
     "metric": {"name": "valid_epoch/mean_F1", "goal": "maximize"},
     "parameters": {
         "window_len": {"values": [3000, 6000]},
-        "lr": {"values": 0.001},
+        "lr": {"value": 0.001},
         "pick_label_type": {"values": ["triangular", "Gaussian"]},
         "sigma": {"values": [20, 75, 100, 150]},
         "epochs": {"value": 10},
