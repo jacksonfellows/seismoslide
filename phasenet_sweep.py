@@ -1,10 +1,10 @@
 import sys
 import time
 
-import seisbench
 import torch
 from torch.utils.data import DataLoader
 
+import my_phasenet
 import train
 import wandb
 
@@ -40,7 +40,7 @@ def do_sweep():
         wandb.config["path"] = f"sweep_{int(time.time())}.pt"
         torch.set_num_threads(1)
 
-        model = seisbench.models.PhaseNet(
+        model = my_phasenet.PhaseNet(
             in_channels=1,
             classes=3,
             phases=["earthquake", "explosion", "surface event"],  # class names,
