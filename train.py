@@ -39,6 +39,8 @@ def add_classif_output(state_dict):
         onset = wandb.config["stride"] * (P_arrival_sample // wandb.config["stride"])
         probs[classi] = make_proba_pick(onset)
     state_dict["y"] = (probs, None)  # Need to indicate empty metadata!
+    # Also add class label.
+    state_dict["class"] = (metadata["source_type"], None)
 
 
 def my_normalize(state_dict):

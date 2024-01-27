@@ -5,7 +5,9 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import torch.functional as F
+import torch.nn.functional as F
+from matplotlib import pyplot as plt
+from sklearn.manifold import TSNE
 from torch.utils.data import DataLoader
 
 import train
@@ -52,3 +54,51 @@ def apply_to_valid(config, model):
             X=X.detach().numpy(),
             y_pred=y_pred.detach().numpy(),
         )
+
+
+def plot_emb_phasenet(config, model):
+    wandb.config = config
+    valid_loader = DataLoader(
+        train.make_generator(train.valid_dataset),
+        64 * 1000,  # Include all samples in one batch.
+        shuffle=True,
+    )
+    d = next(iter(valid_loader))
+    x = d["X"]
+    batchlen = x.shape[0]
+    model.eval()
+    x = model.activation(model.in_bn(model.inc(x)))
+
+    skips = []
+    for i, (conv_same, bn1, conv_down, bn2) in enumerate(model.down_branch):
+        x = model.activation(bn1(conv_same(x)))
+
+        if conv_down is not None:
+            skips.append(x)
+            if i == 1:
+                x = F.pad(x, (2, 3), "constant", 0)
+            elif i == 2:
+                x = F.pad(x, (1, 3), "constant", 0)
+            elif i == 3:
+                x = F.pad(x, (2, 3), "constant", 0)
+
+            x = model.activation(bn2(conv_down(x)))
+
+    skips.append(x)  # Not a real skip.
+
+    # Could plot the skip layers but the deepest layer seems to work best.
+
+    emb_np = skips[-1].reshape(batchlen, -1).detach().numpy()
+    # xy = PCA(n_components=2).fit_transform(emb_np)
+    xy = TSNE(n_components=2).fit_transform(emb_np)
+    class_colors = {
+        "noise": "grey",
+        "earthquake": "red",
+        "explosion": "green",
+        "surface event": "yellow",
+    }
+    for cls, clr in class_colors.items():
+        I = [c == cls for c in d["class"]]  # d["class"] is a list for some reason.
+        plt.scatter(xy[I, 0], xy[I, 1], c=clr, alpha=0.5, label=cls)
+    plt.legend()
+    plt.show()
