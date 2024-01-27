@@ -1,11 +1,8 @@
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
-import scipy
 import seisbench.data
 from obspy import UTCDateTime
-from obspy.signal.filter import bandpass
 
 from mydataset import MyDatasetWriter
 
