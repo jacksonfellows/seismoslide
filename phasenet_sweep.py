@@ -10,8 +10,8 @@ import wandb
 
 sweep_config = {
     "method": "random",
-    "name": "sweep_phasenet",
-    "description": "Try out PhaseNet.",
+    "name": "sweep_phasenet_noise_class",
+    "description": "Try out PhaseNet - noise class.",
     "metric": {"name": "valid_epoch/mean_F1", "goal": "maximize"},
     "parameters": {
         "window_len": {"values": [3000, 6000]},
