@@ -10,8 +10,8 @@ import wandb
 
 sweep_config = {
     "method": "random",
-    "name": "sweep_phasenet",
-    "description": "Try out PhaseNet.",
+    "name": "sweep_phasenet_no_bandpass",
+    "description": "Try out PhaseNet w/o bandpass filtering.",
     "metric": {"name": "valid_epoch/mean_F1", "goal": "maximize"},
     "parameters": {
         "window_len": {"values": [3000, 6000]},

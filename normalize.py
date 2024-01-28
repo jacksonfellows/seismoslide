@@ -1,6 +1,5 @@
 import numpy as np
 import scipy
-from obspy.signal.filter import bandpass
 
 
 def taper(waveform, taper_len_s, freq):
@@ -18,9 +17,4 @@ def normalize(waveform):
     stddev = np.std(normalized)
     if stddev != 0:
         normalized /= np.std(normalized)  # std vs max?
-    normalized = taper(normalized, 1, 100)  # 1s taper
-    # Same frequency range as EQTransformer.
-    normalized = bandpass(
-        normalized, freqmin=1, freqmax=45, df=100, corners=2, zerophase=True
-    )
     return normalized
