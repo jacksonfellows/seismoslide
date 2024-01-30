@@ -1,0 +1,19 @@
+method: random
+name: sweep_phasenet_training_data_multiple
+description: "How much extra (non-SU) training data should I include?"
+metric:
+    name: valid_epoch/mean_F1
+    goal: maximize
+parameters:
+    window_len:
+        value: 3000
+    lr:
+        value: 0.005
+    pick_label_type:
+        value: Gaussian
+    sigma:
+        value: 100
+    epochs:
+        value: 25
+    multiple:
+        values: [1, 2, 4, 8]

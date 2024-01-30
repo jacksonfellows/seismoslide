@@ -6,11 +6,7 @@ import torch.nn.functional as F
 from matplotlib import pyplot as plt
 
 import wandb
-from mydataset import MyDataset
 from normalize import normalize
-
-train_dataset = MyDataset("./pnw_splits/train")
-valid_dataset = MyDataset("./pnw_splits/valid")
 
 CLASSES = ["earthquake", "explosion", "surface event"]
 

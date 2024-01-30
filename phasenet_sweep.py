@@ -7,20 +7,7 @@ from torch.utils.data import DataLoader
 import my_phasenet
 import train
 import wandb
-
-sweep_config = {
-    "method": "random",
-    "name": "sweep_phasenet_no_bandpass_lr",
-    "description": "Figure out best lr for PhaseNet w/o bandpass filtering.",
-    "metric": {"name": "valid_epoch/mean_F1", "goal": "maximize"},
-    "parameters": {
-        "window_len": {"value": 3000},
-        "lr": {"distribution": "log_uniform_values", "max": 0.01, "min": 0.0001},
-        "pick_label_type": {"value": "Gaussian"},
-        "sigma": {"values": [100, 125, 150]},
-        "epochs": {"value": 25},
-    },
-}
+from mydataset import MyDataset
 
 
 def do_sweep():
@@ -47,13 +34,16 @@ def do_sweep():
             sampling_rate=100,
         )
 
+        train_dataset = MyDataset(f"./pnw_splits_{wandb.config['multiple']}/train")
+        valid_dataset = MyDataset(f"./pnw_splits_{wandb.config['multiple']}/valid")
+
         train_loader = DataLoader(
-            train.make_generator(train.train_dataset),
+            train.make_generator(train_dataset),
             wandb.config["batch_size"],
             shuffle=True,
         )
         valid_loader = DataLoader(
-            train.make_generator(train.valid_dataset),
+            train.make_generator(valid_dataset),
             wandb.config["batch_size"],
             shuffle=True,
         )

@@ -67,9 +67,9 @@ def save_event(waveform, metadata, writer, sampling_rate):
             "station_code": metadata.station_code,
             "station_location_code": metadata.station_location_code,
             "trace_start_time": trace_start_time,
-            "trace_P_arrival_sample": PRE_ARRIVAL_LEN_SAMPLES
-            if metadata.source_type != "noise"
-            else None,
+            "trace_P_arrival_sample": (
+                PRE_ARRIVAL_LEN_SAMPLES if metadata.source_type != "noise" else None
+            ),
         },
     )
 
@@ -99,7 +99,7 @@ def write_split(i_su, i_eq, i_ex, i_noise, base_path):
                 )
 
 
-def make_splits(split_dir):
+def make_splits(split_dir, multiple):
     all_su = pnw_exotic.metadata[pnw_exotic.metadata.source_type == "surface event"]
     all_eq = pnw.metadata[pnw.metadata.source_type == "earthquake"]
     all_ex = pnw.metadata[pnw.metadata.source_type == "explosion"]
@@ -108,12 +108,9 @@ def make_splits(split_dir):
     # Surface event indices: Random permutation of all events.
     i_su = np_gen.permutation(all_su.index.to_numpy())
 
-    # Twice as many earthquakes and explosions.
-    i_eq = np_gen.choice(all_eq.index.to_numpy(), size=2 * len(i_su))
-    i_ex = np_gen.choice(all_ex.index.to_numpy(), size=2 * len(i_su))
-
-    # Equal amount of noise.
-    i_noise = np_gen.choice(all_noise.index.to_numpy(), size=len(i_su))
+    i_eq = np_gen.choice(all_eq.index.to_numpy(), size=multiple * len(i_su))
+    i_ex = np_gen.choice(all_ex.index.to_numpy(), size=multiple * len(i_su))
+    i_noise = np_gen.choice(all_noise.index.to_numpy(), size=multiple * len(i_su))
 
     # Split percentages:
     train_p, valid_p, test_p = 0.8, 0.1, 0.1
@@ -134,6 +131,15 @@ def make_splits(split_dir):
     write_split(train_i_su, train_i_eq, train_i_ex, train_i_noise, split_dir / "train")
     write_split(valid_i_su, valid_i_eq, valid_i_ex, valid_i_noise, split_dir / "valid")
     write_split(test_i_su, test_i_eq, test_i_ex, test_i_noise, split_dir / "test")
+
+
+def create_splits_multiples():
+    for multiple in [1, 2, 4, 8]:
+        split_dir = Path(f"./pnw_splits_{multiple}")
+        if split_dir.exists():
+            raise ValueError(f"directory {split_dir} already exists")
+        split_dir.mkdir()
+        make_splits(split_dir, multiple)
 
 
 def create_splits():
