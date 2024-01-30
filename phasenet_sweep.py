@@ -10,15 +10,15 @@ import wandb
 
 sweep_config = {
     "method": "random",
-    "name": "sweep_phasenet_no_bandpass",
-    "description": "Try out PhaseNet w/o bandpass filtering.",
+    "name": "sweep_phasenet_no_bandpass_lr",
+    "description": "Figure out best lr for PhaseNet w/o bandpass filtering.",
     "metric": {"name": "valid_epoch/mean_F1", "goal": "maximize"},
     "parameters": {
-        "window_len": {"values": [3000, 6000]},
-        "lr": {"value": 0.001},
-        "pick_label_type": {"values": ["triangular", "Gaussian"]},
-        "sigma": {"values": [20, 75, 100, 150]},
-        "epochs": {"value": 10},
+        "window_len": {"value": 3000},
+        "lr": {"distribution": "log_uniform_values", "max": 0.01, "min": 0.0001},
+        "pick_label_type": {"value": "Gaussian"},
+        "sigma": {"values": [100, 125, 150]},
+        "epochs": {"value": 25},
     },
 }
 
