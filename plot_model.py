@@ -8,7 +8,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 import wandb
-from train import CLASSES, find_TP_FP_FN
+from train import CLASSES, find_TP_FP_FN, valid_dataset
 
 
 def plot_results(X, y, y_pred):
@@ -33,16 +33,31 @@ def plot_results(X, y, y_pred):
     plt.close(fig)  # ?
 
 
+def make_link(metadata):
+    date = metadata["trace_start_time"][:10]
+    network_code = metadata["station_network_code"]
+    station_code = metadata["station_code"]
+    return f"https://www.iris.edu/app/station_monitor/#{date}/{network_code}-{station_code}/webicorder/"
+
+
 def plot_failures(path):
     with open(Path(path).parent / "config.json", "r") as f:
         config = json.load(f)
     wandb.config = config
     npz = np.load(path)
-    X, y, y_pred = npz["X"][:, 0], npz["y"], npz["y_pred"]
+    X, y, y_pred, metadata_i = (
+        npz["X"][:, 0],
+        npz["y"],
+        npz["y_pred"],
+        npz["metadata_i"],
+    )
     for batchi in range(X.shape[0]):
         tp, fp, fn = find_TP_FP_FN(y[batchi], y_pred[batchi])
         if fp.sum() != 0 or fn.sum() != 0:
             print(tp, fp, fn)
+            m = valid_dataset.metadata.iloc[metadata_i[batchi]]
+            print(m)
+            print(make_link(m))
             plot_results(X[batchi], y[batchi], y_pred[batchi])
 
 

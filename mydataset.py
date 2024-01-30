@@ -23,7 +23,9 @@ class MyDataset(Dataset):
 
     def get_sample(self, i):
         # Needed for Seisbench WaveformDataset.
-        return self[i], self.metadata.loc[i].to_dict()
+        m = self.metadata.loc[i].to_dict()
+        m["metadata_i"] = i
+        return self[i], m
 
 
 class MyDatasetWriter:

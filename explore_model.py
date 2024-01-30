@@ -53,6 +53,7 @@ def apply_to_valid(config, model):
             y=y.detach().numpy(),
             X=X.detach().numpy(),
             y_pred=y_pred.detach().numpy(),
+            metadata_i=d["metadata_i"],
         )
 
 
@@ -98,7 +99,8 @@ def plot_emb_phasenet(config, model):
         "surface event": "yellow",
     }
     for cls, clr in class_colors.items():
-        I = [c == cls for c in d["class"]]  # d["class"] is a list for some reason.
+        # d["source_type"] is a list for some reason.
+        I = [c == cls for c in d["source_type"]]
         plt.scatter(xy[I, 0], xy[I, 1], c=clr, alpha=0.5, label=cls)
     plt.legend()
     plt.show()
