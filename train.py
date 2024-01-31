@@ -159,7 +159,11 @@ def do_loop(dataloader, model, loss_fn, optimizer, do_train):
             batch_logger.do_log()
         y = d["y"]
         y_pred = model(d["X"])
-        loss = loss_fn(y_pred, y)
+        weights = [
+            wandb.config["multiple"] if st == "surface event" else 1
+            for st in d["source_type"]
+        ]
+        loss = loss_fn(y_pred, y, weight=weights)
         if do_train:
             loss.backward()
             optimizer.step()
