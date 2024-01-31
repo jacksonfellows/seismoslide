@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 
 import train
+from mydataset import MyDataset
 import wandb
 from explore_model import load_run
 
@@ -14,12 +15,12 @@ if __name__ == "__main__":
         torch.set_num_threads(1)
 
         train_loader = DataLoader(
-            train.make_generator(train.train_dataset),
+            train.make_generator(MyDataset(f"./pnw_splits_{wandb.config['multiple']}/train")),
             wandb.config["batch_size"],
             shuffle=True,
         )
         valid_loader = DataLoader(
-            train.make_generator(train.valid_dataset),
+            train.make_generator(MyDataset(f"./pnw_splits_{wandb.config['multiple']}/valid")),
             wandb.config["batch_size"],
             shuffle=True,
         )
