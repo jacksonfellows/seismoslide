@@ -1,6 +1,6 @@
 method: random
-name: sweep_phasenet_training_data_multiple
-description: "How much extra (non-SU) training data should I include?"
+name: sweep_phasenet_training_data_multiple_weight
+description: "How much extra (non-SU) training data should I include? Try weighting samples to balance things out."
 metric:
     name: valid_epoch/mean_F1
     goal: maximize
