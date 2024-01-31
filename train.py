@@ -169,7 +169,7 @@ def do_loop(dataloader, model, loss_fn, optimizer, do_train):
         y = d["y"]
         y_pred = model(d["X"])
         loss_all = loss_fn(y_pred, y)
-        loss = torch.mean(d["weight"] * loss_all)
+        loss = torch.mean(d["weight"][:, None, None] * loss_all)
         if do_train:
             loss.backward()
             optimizer.step()
