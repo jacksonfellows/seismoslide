@@ -168,7 +168,8 @@ def do_loop(dataloader, model, loss_fn, optimizer, do_train):
             batch_logger.do_log()
         y = d["y"]
         y_pred = model(d["X"])
-        loss = loss_fn(y_pred, y, weight=d["weight"])
+        loss_all = loss_fn(y_pred, y)
+        loss = torch.mean(d["weight"] * loss_all)
         if do_train:
             loss.backward()
             optimizer.step()
@@ -184,7 +185,7 @@ def train_test_loop(model, train_loader, valid_loader, path, epochs):
     wandb.watch(model, log_freq=100)
     wandb.config["optimizer"] = "Adam"
     optimizer = torch.optim.Adam(model.parameters(), lr=wandb.config["lr"])
-    loss_fn = torch.nn.BCELoss()
+    loss_fn = torch.nn.BCELoss(reduction="none")
 
     try:
         for epoch in range(epochs):
