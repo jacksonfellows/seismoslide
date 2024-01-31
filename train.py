@@ -52,6 +52,14 @@ def add_metadata_i(state_dict):
     state_dict["metadata_i"] = metadata["metadata_i"], None
 
 
+def add_weights(state_dict):
+    _, metadata = state_dict["X"]
+    st = metadata["source_type"]
+    state_dict["weight"] = (
+        wandb.config["multiple"] if st == "surface event" else 1
+    ), None
+
+
 def make_generator(dataset):
     gen = sbg.GenericGenerator(dataset)
     gen.augmentation(
@@ -72,6 +80,7 @@ def make_generator(dataset):
     if wandb.config.get("add_channel_dim"):
         gen.augmentation(add_channel_dim)
     gen.augmentation(add_metadata_i)
+    gen.augmentation(add_weights)
     return gen
 
 
@@ -159,11 +168,7 @@ def do_loop(dataloader, model, loss_fn, optimizer, do_train):
             batch_logger.do_log()
         y = d["y"]
         y_pred = model(d["X"])
-        weights = [
-            wandb.config["multiple"] if st == "surface event" else 1
-            for st in d["source_type"]
-        ]
-        loss = loss_fn(y_pred, y, weight=weights)
+        loss = loss_fn(y_pred, y, weight=d["weight"])
         if do_train:
             loss.backward()
             optimizer.step()
