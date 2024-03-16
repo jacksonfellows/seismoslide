@@ -3,7 +3,7 @@ from matplotlib import pyplot as plt
 
 from normalize import normalize
 
-# Shouldn't need to specific component_order.
+# Shouldn't need to specify component_order.
 train = seisbench.data.WaveformDataset("pnw_all", component_order="Z").train()
 
 
