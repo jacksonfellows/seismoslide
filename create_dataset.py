@@ -1,10 +1,10 @@
+# Create one big seisbench dataset with everything I need.
+
 from pathlib import Path
 
 import numpy as np
 import seisbench.data
 from obspy import UTCDateTime
-
-from mydataset import MyDatasetWriter
 
 
 def shift_P_arrival(
@@ -30,7 +30,7 @@ pnw = seisbench.data.PNW()
 np_gen = np.random.default_rng(123)
 
 
-def save_event(waveform, metadata, writer, sampling_rate):
+def save_event(waveform, metadata, writer, sampling_rate, split):
     WAVEFORM_LEN = 1500 + 6000  # Max possible len for 1 min windows.
     PRE_ARRIVAL_LEN_SAMPLES = 1500
     waveform = waveform[0]  # Z component.
@@ -58,8 +58,7 @@ def save_event(waveform, metadata, writer, sampling_rate):
     if shifted.shape != (WAVEFORM_LEN,):
         print(f"skipping {metadata.source_type} - malformed shape {shifted.shape}")
         return
-    writer.write_sample(
-        shifted.astype("float32"),
+    writer.add_trace(
         {
             "source_type": metadata.source_type,
             "event_id": metadata.get("event_id"),  # Noise waveforms don't have ids.
@@ -67,36 +66,28 @@ def save_event(waveform, metadata, writer, sampling_rate):
             "station_code": metadata.station_code,
             "station_location_code": metadata.station_location_code,
             "trace_start_time": trace_start_time,
-            "trace_P_arrival_sample": PRE_ARRIVAL_LEN_SAMPLES
-            if metadata.source_type != "noise"
-            else None,
+            "trace_P_arrival_sample": (
+                PRE_ARRIVAL_LEN_SAMPLES if metadata.source_type != "noise" else None
+            ),
+            "split": split,
         },
+        shifted.astype("float32")[None, ...],  # Add empty dim.
     )
 
 
-def write_split(i_su, i_eq, i_ex, i_noise, base_path):
-    with MyDatasetWriter(
-        base_path,
-        [
-            "source_type",
-            "event_id",
-            "station_network_code",
-            "station_code",
-            "station_location_code",
-            "trace_start_time",
-            "trace_P_arrival_sample",
-        ],
-    ) as writer:
-        for indices, dataset in zip(
-            [i_su, i_eq, i_ex, i_noise], [pnw_exotic, pnw, pnw, pnw_noise]
-        ):
-            for i in indices:
-                save_event(
-                    dataset.get_waveforms(i),
-                    dataset.metadata.loc[i],
-                    writer,
-                    sampling_rate=100,
-                )
+def write_split(writer, i_su, i_eq, i_ex, i_noise, split):
+    # TODO: Tune bucket size.
+    for indices, dataset in zip(
+        [i_su, i_eq, i_ex, i_noise], [pnw_exotic, pnw, pnw, pnw_noise]
+    ):
+        for i in indices:
+            save_event(
+                dataset.get_waveforms(i),
+                dataset.metadata.loc[i],
+                writer,
+                sampling_rate=100,
+                split=split,
+            )
 
 
 def make_splits(split_dir):
@@ -108,11 +99,9 @@ def make_splits(split_dir):
     # Surface event indices: Random permutation of all events.
     i_su = np_gen.permutation(all_su.index.to_numpy())
 
-    # Twice as many earthquakes and explosions.
-    i_eq = np_gen.choice(all_eq.index.to_numpy(), size=2 * len(i_su))
-    i_ex = np_gen.choice(all_ex.index.to_numpy(), size=2 * len(i_su))
-
-    # Equal amount of noise.
+    # Take equal amount of all other classes.
+    i_eq = np_gen.choice(all_eq.index.to_numpy(), size=len(i_su))
+    i_ex = np_gen.choice(all_ex.index.to_numpy(), size=len(i_su))
     i_noise = np_gen.choice(all_noise.index.to_numpy(), size=len(i_su))
 
     # Split percentages:
@@ -131,13 +120,21 @@ def make_splits(split_dir):
         i_noise, [int(train_p * len(i_noise)), int((train_p + valid_p) * len(i_noise))]
     )
 
-    write_split(train_i_su, train_i_eq, train_i_ex, train_i_noise, split_dir / "train")
-    write_split(valid_i_su, valid_i_eq, valid_i_ex, valid_i_noise, split_dir / "valid")
-    write_split(test_i_su, test_i_eq, test_i_ex, test_i_noise, split_dir / "test")
+    with seisbench.data.WaveformDataWriter(
+        split_dir / "metadata.csv", split_dir / "waveforms.hdf5"
+    ) as writer:
+        writer.data_format = {
+            "dimension_order": "CW",
+            "component_order": "Z",
+            "sampling_rate": 100,
+        }
+        write_split(writer, train_i_su, train_i_eq, train_i_ex, train_i_noise, "train")
+        write_split(writer, valid_i_su, valid_i_eq, valid_i_ex, valid_i_noise, "valid")
+        write_split(writer, test_i_su, test_i_eq, test_i_ex, test_i_noise, "test")
 
 
 def create_splits():
-    split_dir = Path("./pnw_splits")
+    split_dir = Path("./pnw_all")
     if split_dir.exists():
         raise ValueError(f"directory {split_dir} already exists")
     split_dir.mkdir()
