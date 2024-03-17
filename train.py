@@ -1,16 +1,17 @@
 import numpy as np
 import scipy
+import seisbench.data
 import seisbench.generate as sbg
 import torch
 import torch.nn.functional as F
 from matplotlib import pyplot as plt
 
 import wandb
-from mydataset import MyDataset
 from normalize import normalize
 
-train_dataset = MyDataset("./pnw_splits/train")
-valid_dataset = MyDataset("./pnw_splits/valid")
+dataset = seisbench.data.WaveformDataset("./pnw_all")
+train_dataset = dataset.train()
+valid_dataset = dataset.dev()
 
 CLASSES = ["earthquake", "explosion", "surface event"]
 
