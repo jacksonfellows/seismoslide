@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 import wandb
 from normalize import normalize
 
-dataset = seisbench.data.WaveformDataset("./pnw_all")
+dataset = seisbench.data.WaveformDataset("./pnw_all", component_order="Z")
 train_dataset = dataset.train()
 valid_dataset = dataset.dev()
 
@@ -29,8 +29,8 @@ def make_proba_pick(onset):
 def add_classif_output(state_dict):
     waveform, metadata = state_dict["X"]
     P_arrival_sample = metadata.get("trace_P_arrival_sample")
-    assert len(waveform) % wandb.config["stride"] == 0
-    N = len(waveform) // wandb.config["stride"]
+    assert waveform.shape[1] % wandb.config["stride"] == 0
+    N = waveform.shape[1] // wandb.config["stride"]
     probs = np.zeros((len(CLASSES), N), dtype="float32")
     if metadata["source_type"] == "noise":
         pass
@@ -76,7 +76,7 @@ def make_generator(dataset):
     gen.augmentation(add_classif_output)
     if wandb.config.get("add_channel_dim"):
         gen.augmentation(add_channel_dim)
-    gen.augmentation(add_metadata_i)
+    # gen.augmentation(add_metadata_i)
     return gen
 
 
