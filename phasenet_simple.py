@@ -34,8 +34,13 @@ def run():
 
         model = my_phasenet.PhaseNet(
             in_channels=1,
-            classes=3,
-            phases=["earthquake", "explosion", "surface event"],  # class names,
+            classes=4,
+            phases=[
+                "earthquake",
+                "explosion",
+                "surface event",
+                "noise",
+            ],  # class names,
             sampling_rate=100,
         )
 

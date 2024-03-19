@@ -127,7 +127,7 @@ class PhaseNet(WaveformModel):
             self.up_branch.append(nn.ModuleList([conv_up, bn1, conv_same, bn2]))
 
         self.out = nn.Conv1d(last_filters, self.classes, 1, padding="same")
-        # self.softmax = torch.nn.Softmax(dim=1)
+        self.softmax = torch.nn.Softmax(dim=1)
 
     def forward(self, x, logits=False):
         x = self.activation(self.in_bn(self.inc(x)))
@@ -160,9 +160,7 @@ class PhaseNet(WaveformModel):
         if logits:
             return x
         else:
-            # return self.softmax(x)
-            # Don't use softmax b.c. my setup doesn't have an explicit noise class.
-            return torch.sigmoid(x)
+            return self.softmax(x)
 
     @staticmethod
     def _merge_skip(skip, x):

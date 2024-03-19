@@ -31,7 +31,7 @@ def add_classif_output(state_dict):
     P_arrival_sample = metadata.get("trace_P_arrival_sample")
     assert waveform.shape[1] % wandb.config["stride"] == 0
     N = waveform.shape[1] // wandb.config["stride"]
-    probs = np.zeros((len(CLASSES), N), dtype="float32")
+    probs = np.zeros((len(CLASSES) + 1, N), dtype="float32")
     if metadata["source_type"] == "noise":
         pass
     else:
@@ -39,6 +39,7 @@ def add_classif_output(state_dict):
         # Round onset to nearest bin.
         onset = wandb.config["stride"] * (P_arrival_sample // wandb.config["stride"])
         probs[classi] = make_proba_pick(onset)
+    probs[-1] = 1 - np.sum(probs[0:3], axis=0)
     state_dict["y"] = (probs, None)  # Need to indicate empty metadata!
 
 
@@ -180,7 +181,7 @@ def train_test_loop(model, train_loader, valid_loader, path, epochs):
     wandb.watch(model, log_freq=100)
     wandb.config["optimizer"] = "Adam"
     optimizer = torch.optim.Adam(model.parameters(), lr=wandb.config["lr"])
-    loss_fn = torch.nn.BCELoss()
+    loss_fn = torch.nn.CrossEntropyLoss()
 
     try:
         for epoch in range(epochs):
