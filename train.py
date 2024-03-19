@@ -164,13 +164,14 @@ def do_loop(dataloader, model, loss_fn, optimizer, do_train):
             print(f"{i}/{n_batches}")
             batch_logger.do_log()
         y = d["y"]
-        y_pred = model(d["X"])
+        y_pred = model(d["X"], logits=True)
         loss = loss_fn(y_pred, y)
         if do_train:
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
-        y_pred_detached = y_pred.detach()
+        # Apply softmax to logits.
+        y_pred_detached = F.softmax(y_pred, dim=1).detach()
         loss_detached = loss.detach()
         batch_logger.update_batch(y, y_pred_detached, loss_detached)
         epoch_logger.update_batch(y, y_pred_detached, loss_detached)
