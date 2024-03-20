@@ -84,17 +84,12 @@ def make_generator(dataset):
 def find_TP_FP_FN(y_true, y_pred):
     # y_true.shape == y_pred.shape == (num_classes, num_segments)
     TP, FP, FN = np.zeros(3), np.zeros(3), np.zeros(3)
+    find_peaks_kwargs = dict(
+        height=wandb.config["threshold"], distance=wandb.config["min_distance"]
+    )
     for classi in range(len(CLASSES)):
-        peaks_true, _ = scipy.signal.find_peaks(
-            y_true[classi],
-            height=wandb.config["threshold"],
-            prominence=wandb.config["threshold"] / 2,
-        )
-        peaks_pred, _ = scipy.signal.find_peaks(
-            y_pred[classi],
-            height=wandb.config["threshold"],
-            prominence=wandb.config["threshold"] / 2,
-        )
+        peaks_true, _ = scipy.signal.find_peaks(y_true[classi], **find_peaks_kwargs)
+        peaks_pred, _ = scipy.signal.find_peaks(y_pred[classi], **find_peaks_kwargs)
         peaks_true, peaks_pred = (
             wandb.config["stride"] * peaks_true,
             wandb.config["stride"] * peaks_pred,

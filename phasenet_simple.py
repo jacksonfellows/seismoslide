@@ -14,7 +14,7 @@ config = {
     "pick_label_type": "Gaussian",
     "sigma": 100,
     "epochs": 25,
-    "min_distance": 100,
+    "min_distance": 250,
     "window_low": 0,
     "batch_size": 64,
     "threshold": 0.5,
