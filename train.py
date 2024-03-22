@@ -17,8 +17,8 @@ CLASSES = ["earthquake", "explosion", "surface event"]
 
 
 def make_proba_pick(onset):
-    N = wandb.config["window_len"] // wandb.config["stride"]
-    x = np.arange(N) * wandb.config["stride"]
+    N = wandb.config["window_len"]
+    x = np.arange(N)
     if wandb.config["pick_label_type"] == "Gaussian":
         return np.exp(-((x - onset) ** 2) / (2 * wandb.config["sigma"] ** 2))
     if wandb.config["pick_label_type"] == "triangular":
@@ -29,15 +29,13 @@ def make_proba_pick(onset):
 def add_classif_output(state_dict):
     waveform, metadata = state_dict["X"]
     P_arrival_sample = metadata.get("trace_P_arrival_sample")
-    assert waveform.shape[1] % wandb.config["stride"] == 0
-    N = waveform.shape[1] // wandb.config["stride"]
+    N = waveform.shape[1]
     probs = np.zeros((len(CLASSES) + 1, N), dtype="float32")
     if metadata["source_type"] == "noise":
         pass
     else:
         classi = CLASSES.index(metadata["source_type"])
-        # Round onset to nearest bin.
-        onset = wandb.config["stride"] * (P_arrival_sample // wandb.config["stride"])
+        onset = P_arrival_sample
         probs[classi] = make_proba_pick(onset)
     probs[-1] = 1 - np.sum(probs[0:3], axis=0)
     state_dict["y"] = (probs, None)  # Need to indicate empty metadata!
@@ -90,10 +88,7 @@ def find_TP_FP_FN(y_true, y_pred):
     for classi in range(len(CLASSES)):
         peaks_true, _ = scipy.signal.find_peaks(y_true[classi], **find_peaks_kwargs)
         peaks_pred, _ = scipy.signal.find_peaks(y_pred[classi], **find_peaks_kwargs)
-        peaks_true, peaks_pred = (
-            wandb.config["stride"] * peaks_true,
-            wandb.config["stride"] * peaks_pred,
-        )
+        peaks_true, peaks_pred = peaks_true, peaks_pred
         if len(peaks_true) == 0:
             FP[classi] += len(peaks_pred)
         else:
