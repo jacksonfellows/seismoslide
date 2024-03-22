@@ -40,6 +40,9 @@ class PhaseNet(WaveformModel):
         phases="NPS",
         sampling_rate=100,
         norm="std",
+        depth=5,
+        kernel_size=7,
+        stride=4,
         **kwargs,
     ):
         citation = (
@@ -70,9 +73,9 @@ class PhaseNet(WaveformModel):
         self.in_channels = in_channels
         self.classes = classes
         self.norm = norm
-        self.depth = 5
-        self.kernel_size = 7
-        self.stride = 4
+        self.depth = depth
+        self.kernel_size = kernel_size
+        self.stride = stride
         self.filters_root = 8
         self.activation = torch.relu
 

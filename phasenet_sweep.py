@@ -8,32 +8,37 @@ import my_phasenet
 import train
 import wandb
 
+config = {
+    "window_len": 3000,
+    "lr": 1e-3,
+    "pick_label_type": "Gaussian",
+    "sigma": 100,
+    "epochs": 25,
+    "min_distance": 250,
+    "window_low": 0,
+    "batch_size": 64,
+    "threshold": 0.5,
+    "model": "Seisbench Phasenet 1",
+    "stride": 1,
+    "add_channel_dim": False,
+}
+
 sweep_config = {
+    "project": "seismoslide",
     "method": "random",
-    "name": "sweep_phasenet_no_bandpass_lr",
-    "description": "Figure out best lr for PhaseNet w/o bandpass filtering.",
-    "metric": {"name": "valid_epoch/mean_F1", "goal": "maximize"},
+    "name": "sweep_phasenet_params",
+    "description": "Figure out best model parameters for PhaseNet.",
+    "metric": {"name": "valid_epoch/surface_event_F1", "goal": "maximize"},
     "parameters": {
-        "window_len": {"value": 3000},
-        "lr": {"distribution": "log_uniform_values", "max": 0.01, "min": 0.0001},
-        "pick_label_type": {"value": "Gaussian"},
-        "sigma": {"values": [100, 125, 150]},
-        "epochs": {"value": 25},
+        "depth": {"min": 3, "max": 7},
+        "kernel_size": {"min": 3, "max": 11},
+        "stride": {"values": [2, 4, 8]},
     },
 }
 
 
 def do_sweep():
-    default_config = {
-        "min_distance": 100,
-        "window_low": 0,
-        "batch_size": 64,
-        "threshold": 0.5,
-        "model": "Seisbench Phasenet 1",
-        "stride": 1,
-        "add_channel_dim": True,
-    }
-    with wandb.init(config=default_config):
+    with wandb.init(config=config):
         # Set window_high based on window_len.
         wandb.config["window_high"] = wandb.config["window_len"] + 1500 - 200
         # Set a unique path.
@@ -50,6 +55,9 @@ def do_sweep():
                 "noise",
             ],  # class names,
             sampling_rate=100,
+            depth=wandb.config["depth"],
+            kernel_size=wandb.config["kernel_size"],
+            stride=wandb.config["stride"],
         )
 
         train_loader = DataLoader(
