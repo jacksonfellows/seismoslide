@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import seisbench.data
 from obspy import UTCDateTime
 
@@ -100,12 +101,32 @@ def make_splits(split_dir):
     all_su_extra = pnw_exotic_more.metadata[
         pnw_exotic_more.metadata.source_type == "surface event"
     ]
+
+    # Remove events from the PNSN dataset that we picked.
+    print(f"# PNSN SU events: {len(all_su)}")
+    unique_trace_cols = [
+        "event_id",
+        "station_network_code",
+        "station_channel_code",
+        "station_code",
+        "station_location_code",
+    ]
+    M = all_su.merge(
+        all_su_extra,
+        indicator=True,
+        how="left",
+        suffixes=(None, "_y"),
+        on=unique_trace_cols,
+    )
+    all_su = M[M["_merge"] == "left_only"]
+    print(f"# PNSN SU events w/o duplicates: {len(all_su)}")
+
     all_eq = pnw.metadata[pnw.metadata.source_type == "earthquake"]
     all_ex = pnw.metadata[pnw.metadata.source_type == "explosion"]
     all_noise = pnw_noise.metadata
 
     # Surface event indices: Random permutation of all events.
-    i_su = np_gen.permutation(all_su.index.to_numpy())
+    i_su = np_gen.permutation(all_su["index"].to_numpy())
     i_su_extra = np_gen.permutation(all_su_extra.index.to_numpy())
 
     n_su = len(i_su) + len(i_su_extra)
