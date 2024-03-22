@@ -116,7 +116,7 @@ class PhaseNet(WaveformModel):
             self.down_branch.append(nn.ModuleList([conv_same, bn1, conv_down, bn2]))
 
         for i in range(self.depth - 1):
-            filters = int(2 ** (3 - i) * self.filters_root)
+            filters = int(2 ** (self.depth - 2 - i) * self.filters_root)
             conv_up = nn.ConvTranspose1d(
                 last_filters, filters, self.kernel_size, self.stride, bias=False
             )
@@ -154,7 +154,7 @@ class PhaseNet(WaveformModel):
             zip(self.up_branch, skips[::-1])
         ):
             x = self.activation(bn1(conv_up(x)))
-            x = x[:, :, 1:-2]
+            # x = x[:, :, 1:-2]
 
             x = self._merge_skip(skip, x)
             x = self.activation(bn2(conv_same(x)))
@@ -168,6 +168,8 @@ class PhaseNet(WaveformModel):
     @staticmethod
     def _merge_skip(skip, x):
         offset = (x.shape[-1] - skip.shape[-1]) // 2
+        if offset < 0:
+            print("negative offset!")
         x_resize = x[:, :, offset : offset + skip.shape[-1]]
 
         return torch.cat([skip, x_resize], dim=1)
