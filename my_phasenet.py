@@ -83,7 +83,7 @@ class PhaseNet(WaveformModel):
         self.inc = nn.Conv1d(
             self.in_channels, self.filters_root, self.kernel_size, padding="same"
         )
-        self.in_bn = nn.BatchNorm1d(8, eps=1e-3)
+        self.in_bn = nn.BatchNorm1d(self.filters_root, eps=1e-3)
 
         self.down_branch = nn.ModuleList()
         self.up_branch = nn.ModuleList()
