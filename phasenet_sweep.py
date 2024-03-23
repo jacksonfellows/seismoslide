@@ -13,7 +13,7 @@ config = {
     "lr": 1e-3,
     "pick_label_type": "Gaussian",
     "sigma": 100,
-    "epochs": 25,
+    "epochs": 50,
     "min_distance": 250,
     "window_low": 0,
     "batch_size": 64,
@@ -26,13 +26,13 @@ config = {
 sweep_config = {
     "project": "seismoslide",
     "method": "random",
-    "name": "sweep_phasenet_params",
+    "name": "sweep_phasenet_params_2",
     "description": "Figure out best model parameters for PhaseNet.",
     "metric": {"name": "valid_epoch/surface_event_F1", "goal": "maximize"},
     "parameters": {
-        "depth": {"min": 3, "max": 7},
-        "kernel_size": {"min": 3, "max": 11},
-        "stride": {"values": [2, 4, 8]},
+        "depth": {"min": 5, "max": 9},
+        "kernel_size": {"min": 7, "max": 15},
+        "stride": {"values": [4, 8, 16]},
     },
 }
 
