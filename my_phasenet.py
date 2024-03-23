@@ -43,6 +43,7 @@ class PhaseNet(WaveformModel):
         depth=5,
         kernel_size=7,
         stride=4,
+        filters_root=8,
         **kwargs,
     ):
         citation = (
@@ -76,7 +77,7 @@ class PhaseNet(WaveformModel):
         self.depth = depth
         self.kernel_size = kernel_size
         self.stride = stride
-        self.filters_root = 8
+        self.filters_root = filters_root
         self.activation = torch.relu
 
         self.inc = nn.Conv1d(

@@ -26,13 +26,14 @@ config = {
 sweep_config = {
     "project": "seismoslide",
     "method": "random",
-    "name": "sweep_phasenet_params_2",
+    "name": "sweep_phasenet_params_3",
     "description": "Figure out best model parameters for PhaseNet.",
     "metric": {"name": "valid_epoch/surface_event_F1", "goal": "maximize"},
     "parameters": {
-        "depth": {"min": 5, "max": 9},
-        "kernel_size": {"min": 7, "max": 15},
-        "stride": {"values": [4, 8, 16]},
+        "depth": {"min": 5, "max": 6},
+        "kernel_size": {"values": [5, 7, 9, 11]},
+        "stride": {"values": [4]},
+        "filters_root": {"values": [4, 6, 8]}
     },
 }
 
@@ -58,6 +59,7 @@ def do_sweep():
             depth=wandb.config["depth"],
             kernel_size=wandb.config["kernel_size"],
             stride=wandb.config["stride"],
+            filters_root=wandb.config["filters_root"],
         )
 
         train_loader = DataLoader(
