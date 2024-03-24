@@ -169,11 +169,12 @@ class PhaseNet(WaveformModel):
     @staticmethod
     def _merge_skip(skip, x):
         offset = (x.shape[-1] - skip.shape[-1]) // 2
-        if offset < 0:
-            print("negative offset!")
-        x_resize = x[:, :, offset : offset + skip.shape[-1]]
+        if offset >= 0:
+            x = x[:, :, offset : offset + skip.shape[-1]]
+        elif offset < 0:
+            x = F.pad(x, (skip.shape[-1] - x.shape[-1], 0), "constant", 0)
 
-        return torch.cat([skip, x_resize], dim=1)
+        return torch.cat([skip, x], dim=1)
 
     def annotate_window_pre(self, window, argdict):
         # Add a demean and normalize step to the preprocessing
