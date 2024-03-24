@@ -19,21 +19,20 @@ config = {
     "batch_size": 64,
     "threshold": 0.5,
     "model": "Seisbench Phasenet 1",
-    "stride": 1,
     "add_channel_dim": False,
+    "depth": 6,
+    "stride": 4,
+    "filters_root": 8,
 }
 
 sweep_config = {
     "project": "seismoslide",
     "method": "random",
-    "name": "sweep_phasenet_params_3",
+    "name": "sweep_phasenet_params_4",
     "description": "Figure out best model parameters for PhaseNet.",
-    "metric": {"name": "valid_epoch/surface_event_F1", "goal": "maximize"},
+    "metric": {"name": "valid_epoch/surface event_F1", "goal": "maximize"},
     "parameters": {
-        "depth": {"min": 5, "max": 6},
-        "kernel_size": {"values": [5, 7, 9, 11]},
-        "stride": {"values": [4]},
-        "filters_root": {"values": [4, 6, 8]}
+        "kernel_size": {"values": [3, 5, 7, 9, 11, 13]},
     },
 }
 
