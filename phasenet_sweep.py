@@ -9,7 +9,6 @@ import train
 import wandb
 
 config = {
-    "window_len": 3000,
     "lr": 1e-3,
     "pick_label_type": "Gaussian",
     "sigma": 100,
@@ -23,16 +22,17 @@ config = {
     "depth": 6,
     "stride": 4,
     "filters_root": 8,
+    "kernel_size": 7,
 }
 
 sweep_config = {
     "project": "seismoslide",
-    "method": "random",
-    "name": "sweep_phasenet_params_4",
-    "description": "Figure out best model parameters for PhaseNet.",
+    "method": "grid",
+    "name": "sweep_phasenet_params_5",
+    "description": "Window len.",
     "metric": {"name": "valid_epoch/surface event_F1", "goal": "maximize"},
     "parameters": {
-        "kernel_size": {"values": [3, 5, 7, 9, 11, 13]},
+        "window_len": {"values": [1000, 2000, 3000, 4000, 5000, 6000]}
     },
 }
 
