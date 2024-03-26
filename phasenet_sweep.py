@@ -10,8 +10,6 @@ import wandb
 
 config = {
     "lr": 1e-3,
-    "pick_label_type": "Gaussian",
-    "sigma": 100,
     "epochs": 50,
     "min_distance": 250,
     "window_low": 0,
@@ -23,16 +21,18 @@ config = {
     "stride": 4,
     "filters_root": 8,
     "kernel_size": 7,
+    "window_len": 6000,
 }
 
 sweep_config = {
     "project": "seismoslide",
     "method": "grid",
-    "name": "sweep_phasenet_params_5",
-    "description": "Window len.",
+    "name": "sweep_phasenet_params_6",
+    "description": "Label size & shape.",
     "metric": {"name": "valid_epoch/surface event_F1", "goal": "maximize"},
     "parameters": {
-        "window_len": {"values": [1000, 2000, 3000, 4000, 5000, 6000]}
+        "pick_label_type": {"values": ["Gaussian", "triangular"]},
+        "sigma": {"values": [50, 100, 150, 200]},
     },
 }
 
