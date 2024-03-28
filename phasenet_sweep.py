@@ -27,12 +27,12 @@ config = {
 sweep_config = {
     "project": "seismoslide",
     "method": "grid",
-    "name": "sweep_phasenet_params_6",
-    "description": "Label size & shape.",
+    "name": "sweep_phasenet_params_7",
+    "description": "Label size.",
     "metric": {"name": "valid_epoch/surface event_F1", "goal": "maximize"},
     "parameters": {
-        "pick_label_type": {"values": ["Gaussian", "triangular"]},
-        "sigma": {"values": [50, 100, 150, 200]},
+        "pick_label_type": {"value": "Gaussian"},
+        "sigma": {"values": [50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150]},
     },
 }
 
