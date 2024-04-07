@@ -9,7 +9,7 @@ import train
 import wandb
 
 config = {
-    "epochs": 50,
+    "epochs": 100,
     "min_distance": 250,
     "window_low": 0,
     "batch_size": 64,

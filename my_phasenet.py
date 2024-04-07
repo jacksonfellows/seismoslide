@@ -44,6 +44,7 @@ class PhaseNet(WaveformModel):
         kernel_size=7,
         stride=4,
         filters_root=8,
+        in_samples=3001,
         **kwargs,
     ):
         citation = (
@@ -63,7 +64,7 @@ class PhaseNet(WaveformModel):
 
         super().__init__(
             citation=citation,
-            in_samples=3001,
+            in_samples=in_samples,
             output_type="array",
             pred_sample=(0, 3001),
             labels=phases,
