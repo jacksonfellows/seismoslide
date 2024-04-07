@@ -9,7 +9,6 @@ import train
 import wandb
 
 config = {
-    "lr": 1e-3,
     "epochs": 50,
     "min_distance": 250,
     "window_low": 0,
@@ -22,18 +21,17 @@ config = {
     "filters_root": 8,
     "kernel_size": 7,
     "window_len": 6000,
+    "pick_label_type": "Gaussian",
+    "sigma": 100,
 }
 
 sweep_config = {
     "project": "seismoslide",
     "method": "grid",
-    "name": "sweep_phasenet_params_7",
-    "description": "Label size.",
+    "name": "sweep_phasenet_params_8",
+    "description": "Learning rate.",
     "metric": {"name": "valid_epoch/surface event_F1", "goal": "maximize"},
-    "parameters": {
-        "pick_label_type": {"value": "Gaussian"},
-        "sigma": {"values": [50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150]},
-    },
+    "parameters": {"lr": {"values": [1e-2, 1e-3, 1e-4]}},
 }
 
 
@@ -46,6 +44,7 @@ def do_sweep():
         torch.set_num_threads(1)
 
         model = my_phasenet.PhaseNet(
+            in_samples=wandb.config["window_len"],
             in_channels=1,
             classes=4,
             phases=[
