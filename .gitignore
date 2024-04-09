@@ -1,3 +1,7 @@
 __pycache__
 pnw_splits/
 .DS_Store
+
+test-rover-repo/data
+test-rover-repo/logs
+test-rover-repo/tmp
