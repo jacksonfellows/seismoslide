@@ -34,14 +34,16 @@ np_gen = np.random.default_rng(123)
 
 
 def save_event(waveform, metadata, writer, sampling_rate, split, picker):
-    WAVEFORM_LEN = 1500 + 6000  # Max possible len for 1 min windows.
-    PRE_ARRIVAL_LEN_SAMPLES = 1500
+    WAVEFORM_LEN = 6000 + 6000  # Max possible len for 1 min windows.
+    PRE_ARRIVAL_LEN_SAMPLES = 6000
     waveform = waveform[0]  # Z component.
+    WAVEFORM_LEN = min(waveform.shape[0], WAVEFORM_LEN)
     if np.all(waveform == 0):
         print(f"skipping {metadata.source_type} - 0'd waveform")
         return
     if metadata.source_type != "noise":
         trace_P_arrival_sample = metadata.trace_P_arrival_sample
+        PRE_ARRIVAL_LEN_SAMPLES = min(PRE_ARRIVAL_LEN_SAMPLES, trace_P_arrival_sample)
         if np.isnan(trace_P_arrival_sample):
             print(f"skipping {metadata.source_type} - no trace_P_arrival_sample")
             return
@@ -195,7 +197,7 @@ def make_splits(split_dir):
 
 
 def create_splits():
-    split_dir = Path("./pnw_all")
+    split_dir = Path("./pnw_all_2")
     if split_dir.exists():
         raise ValueError(f"directory {split_dir} already exists")
     split_dir.mkdir()

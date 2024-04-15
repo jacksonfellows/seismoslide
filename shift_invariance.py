@@ -11,7 +11,8 @@ from train import CLASSES
 with open("model1.pickle", "rb") as f:
     model = pickle.load(f)
 
-pnw_exotic = seisbench.data.PNWExotic(component_order="Z")
+# pnw_exotic = seisbench.data.PNWExotic(component_order="Z")
+valid_dataset = seisbench.data.WaveformDataset("pnw_all_2", component_order="Z").dev()
 
 
 def find_peaks(y):
@@ -43,7 +44,7 @@ def plot(X, y):
 
 
 def check(i):
-    sample_X, sample_m = pnw_exotic.get_sample(i)
+    sample_X, sample_m = valid_dataset.get_sample(i)
     print(sample_X.shape)
     print(sample_m)
     arrival_sample = int(sample_m["trace_P_arrival_sample"])
