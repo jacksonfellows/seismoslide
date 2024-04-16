@@ -84,7 +84,7 @@ def calc_offsets_probs(model_path, i):
 
 
 def check_avg(N, *model_paths):
-    plt.title(f"Mean of {N} Samples")
+    plt.title(f"Mean of {N} Events")
     plt.xlabel("Arrival Sample")
     plt.ylabel("Prob. of Correct Class @ Arrival Sample")
     plt.ylim(0, 1)
@@ -99,8 +99,8 @@ def check_avg(N, *model_paths):
         for model_path_i, model_path in enumerate(model_paths):
             _, probs = calc_offsets_probs(model_path, i)
             prob_means[model_path_i] += probs
-    for i, model_path in enumerate(model_paths):
-        plt.plot(offsets, prob_means[i] / N, label=model_path)
+    for model_path_i, model_path in enumerate(model_paths):
+        plt.plot(offsets, prob_means[model_path_i] / N, label=model_path)
     plt.legend()
     plt.show()
 
