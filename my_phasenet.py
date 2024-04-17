@@ -1,80 +1,21 @@
-import json
-
-import numpy as np
-import scipy.signal
-import seisbench.util as sbu
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from packaging import version
-from seisbench.models.base import WaveformModel, _cache_migration_v0_v3
 
 
-class PhaseNet(WaveformModel):
-    """
-    .. document_args:: seisbench.models PhaseNet
-    """
+class PhaseNet(torch.nn.Module):
+    """PyTorch implementation of PhaseNet.
 
-    _annotate_args = WaveformModel._annotate_args.copy()
-    _annotate_args["*_threshold"] = ("Detection threshold for the provided phase", 0.3)
-    _annotate_args["blinding"] = (
-        "Number of prediction samples to discard on each side of each window prediction",
-        (0, 0),
-    )
-    _annotate_args["overlap"] = (_annotate_args["overlap"][0], 1500)
-
-    _weight_warnings = [
-        (
-            "ethz|geofon|instance|iquique|lendb|neic|scedc|stead",
-            "1",
-            "The normalization for this weight version is incorrect and will lead to degraded performance. "
-            "Run from_pretrained with update=True once to solve this issue. "
-            "For details, see https://github.com/seisbench/seisbench/pull/188 .",
-        ),
-    ]
+    Based on version included in seisbench but modified to support variable
+    depth, kernel_size, and stride."""
 
     def __init__(
-        self,
-        in_channels=3,
-        classes=3,
-        phases="NPS",
-        sampling_rate=100,
-        norm="std",
-        depth=5,
-        kernel_size=7,
-        stride=4,
-        filters_root=8,
-        in_samples=3001,
-        **kwargs,
+        self, in_channels=3, classes=3, depth=5, kernel_size=7, stride=4, filters_root=8
     ):
-        citation = (
-            "Zhu, W., & Beroza, G. C. (2019). "
-            "PhaseNet: a deep-neural-network-based seismic arrival-time picking method. "
-            "Geophysical Journal International, 216(1), 261-273. "
-            "https://doi.org/10.1093/gji/ggy423"
-        )
-
-        # PickBlue options
-        for option in ("norm_amp_per_comp", "norm_detrend"):
-            if option in kwargs:
-                setattr(self, option, kwargs[option])
-                del kwargs[option]
-            else:
-                setattr(self, option, False)
-
-        super().__init__(
-            citation=citation,
-            in_samples=in_samples,
-            output_type="array",
-            pred_sample=(0, 3001),
-            labels=phases,
-            sampling_rate=sampling_rate,
-            **kwargs,
-        )
+        super().__init__()
 
         self.in_channels = in_channels
         self.classes = classes
-        self.norm = norm
         self.depth = depth
         self.kernel_size = kernel_size
         self.stride = stride
@@ -176,157 +117,3 @@ class PhaseNet(WaveformModel):
             x = F.pad(x, (skip.shape[-1] - x.shape[-1], 0), "constant", 0)
 
         return torch.cat([skip, x], dim=1)
-
-    def annotate_window_pre(self, window, argdict):
-        # Add a demean and normalize step to the preprocessing
-        window = window - np.mean(window, axis=-1, keepdims=True)
-        if self.norm_detrend:
-            detrended = np.zeros(window.shape)
-            for i, a in enumerate(window):
-                detrended[i, :] = scipy.signal.detrend(a)
-            window = detrended
-        if self.norm_amp_per_comp:
-            amp_normed = np.zeros(window.shape)
-            for i, a in enumerate(window):
-                amp = a / (np.max(np.abs(a)) + 1e-10)
-                amp_normed[i, :] = amp
-            window = amp_normed
-        else:
-            if self.norm == "std":
-                std = np.std(window, axis=-1, keepdims=True)
-                std[std == 0] = 1  # Avoid NaN errors
-                window = window / std
-            elif self.norm == "peak":
-                peak = np.max(np.abs(window), axis=-1, keepdims=True) + 1e-10
-                window = window / peak
-
-        return window
-
-    def annotate_window_post(self, pred, piggyback=None, argdict=None):
-        # Transpose predictions to correct shape
-        pred = pred.T
-        prenan, postnan = argdict.get(
-            "blinding", self._annotate_args.get("blinding")[1]
-        )
-        if prenan > 0:
-            pred[:prenan] = np.nan
-        if postnan > 0:
-            pred[-postnan:] = np.nan
-        return pred
-
-    def classify_aggregate(self, annotations, argdict) -> sbu.ClassifyOutput:
-        """
-        Converts the annotations to discrete thresholds using
-        :py:func:`~seisbench.models.base.WaveformModel.picks_from_annotations`.
-        Trigger onset thresholds for picks are derived from the argdict at keys "[phase]_threshold".
-
-        :param annotations: See description in superclass
-        :param argdict: See description in superclass
-        :return: List of picks
-        """
-        picks = sbu.PickList()
-        for phase in self.labels:
-            if phase == "N":
-                # Don't pick noise
-                continue
-
-            picks += self.picks_from_annotations(
-                annotations.select(channel=f"{self.__class__.__name__}_{phase}"),
-                argdict.get(
-                    f"{phase}_threshold", self._annotate_args.get("*_threshold")[1]
-                ),
-                phase,
-            )
-
-        picks = sbu.PickList(sorted(picks))
-
-        return sbu.ClassifyOutput(self.name, picks=picks)
-
-    def get_model_args(self):
-        model_args = super().get_model_args()
-        for key in [
-            "citation",
-            "in_samples",
-            "output_type",
-            "default_args",
-            "pred_sample",
-            "labels",
-            "sampling_rate",
-        ]:
-            del model_args[key]
-
-        model_args["in_channels"] = self.in_channels
-        model_args["classes"] = self.classes
-        model_args["phases"] = self.labels
-        model_args["sampling_rate"] = self.sampling_rate
-
-        return model_args
-
-    @classmethod
-    def from_pretrained_expand(
-        cls, name, version_str="latest", update=False, force=False, wait_for_file=False
-    ):
-        """
-        Load pretrained model with weights and copy the input channel weights that match the Z component to a new,
-        4th dimension that is used to process the hydrophone component of the input trace.
-
-        For further instructions, see :py:func:`~seisbench.models.base.SeisBenchModel.from_pretrained`. This method
-        differs from :py:func:`~seisbench.models.base.SeisBenchModel.from_pretrained` in that it does not call helper
-        functions to load the model weights. Instead it covers the same logic and, in addition, takes intermediate
-        steps to insert a new `in_channels` dimension to the loaded model and copy weights.
-
-        :param name: Model name prefix.
-        :type name: str
-        :param version_str: Version of the weights to load. Either a version string or "latest". The "latest" model is
-                            the model with the highest version number.
-        :type version_str: str
-        :param force: Force execution of download callback, defaults to False
-        :type force: bool, optional
-        :param update: If true, downloads potential new weights file and config from the remote repository.
-                       The old files are retained with their version suffix.
-        :type update: bool
-        :param wait_for_file: Whether to wait on partially downloaded files, defaults to False
-        :type wait_for_file: bool, optional
-        :return: Model instance
-        :rtype: SeisBenchModel
-        """
-        cls._cleanup_local_repository()
-        _cache_migration_v0_v3()
-
-        if version_str == "latest":
-            versions = cls.list_versions(name, remote=update)
-            # Always query remote versions if cache is empty
-            if len(versions) == 0:
-                versions = cls.list_versions(name, remote=True)
-
-            if len(versions) == 0:
-                raise ValueError(f"No version for weight '{name}' available.")
-            version_str = max(versions, key=version.parse)
-
-        weight_path, metadata_path = cls._pretrained_path(name, version_str)
-
-        cls._ensure_weight_files(
-            name, version_str, weight_path, metadata_path, force, wait_for_file
-        )
-
-        if metadata_path.is_file():
-            with open(metadata_path, "r") as f:
-                weights_metadata = json.load(f)
-        else:
-            weights_metadata = {}
-        model_args = weights_metadata.get("model_args", {})
-        model_args["in_channels"] = 4
-        model = cls(**model_args)
-
-        model._weights_metadata = weights_metadata
-        model._parse_metadata()
-
-        state_dict = torch.load(weight_path)
-        old_weight = state_dict["inc.weight"]
-        state_dict["inc.weight"] = torch.zeros(
-            old_weight.shape[0], old_weight.shape[1] + 1, old_weight.shape[2]
-        ).type_as(old_weight)
-        state_dict["inc.weight"][:, :3, ...] = old_weight
-        state_dict["inc.weight"][:, 3, ...] = old_weight[:, 0, ...]
-        model.load_state_dict(state_dict)
-        return model
