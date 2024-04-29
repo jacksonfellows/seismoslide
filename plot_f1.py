@@ -15,13 +15,18 @@ f1_scores = load_f1()
 
 
 def plot_f1():
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(6, 3.5), layout="tight")
     n = dict(
-        mean_f1="Mean", eq_f1="Earthquake", ex_f1="Explosion", su_f1="Surface Event"
+        mean_f1="Mean of all classes",
+        eq_f1="Earthquake",
+        ex_f1="Explosion",
+        su_f1="Surface event",
     )
-    plt.title("F1 Scores on Test Dataset")
+    plt.title("Test dataset (100 runs)")
     ax.set_xticklabels([n[c] for c in f1_scores.columns])
-    plt.ylabel("F1 Score")
-    plt.xlabel("Event Class")
-    plt.boxplot(f1_scores)
-    plt.show()
+    plt.ylabel("F1 score")
+    plt.ylim(0.9, 1.0)
+    plt.yticks(np.arange(0.9, 1.01, 0.01))
+    plt.xlabel("Event class")
+    plt.boxplot(f1_scores, medianprops=dict(color="r"))
+    plt.savefig("f1_scores.png", dpi=300)
