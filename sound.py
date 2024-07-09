@@ -16,7 +16,7 @@ if __name__ == "__main__":
     i = int(sys.argv[3])
     x, metadata = dataset.get_sample(i)
     x = x[0]  # Z component
-    x = normalize(x)
+    x = normalize([x])[0]
     x /= np.abs(x).max()
     print(metadata)
     sd.play(x, speedup * 100, blocking=True)

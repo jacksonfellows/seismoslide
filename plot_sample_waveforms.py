@@ -18,8 +18,8 @@ def plot_sample_waveforms():
         i = train.metadata[train.metadata.source_type == cat].index
         print(cati, cat, i)
         for n in range(N):
-            waveform = train.get_waveforms(i[n])[0]
-            waveform = normalize(waveform)
+            waveform = train.get_waveforms(i[n])
+            waveform = normalize(waveform)[0]
             arrival = train.metadata.iloc[i[n]].get("trace_P_arrival_sample")
             axs[cati, n].plot(waveform, color="k", linewidth=0.5)
             if arrival:
